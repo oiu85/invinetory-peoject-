@@ -12,8 +12,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Disable CSRF for all API routes (we use token-based auth, not cookies)
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+        ]);
+
+        // Add CORS middleware for API routes
         $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \App\Http\Middleware\CorsMiddleware::class,
         ]);
 

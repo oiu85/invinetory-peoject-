@@ -1,0 +1,162 @@
+---
+alwaysApply: true
+You are an expert Laravel backend engineer. I need you to generate a simple, clean backend for a university graduation project. The project is a basic Warehouse + Delivery Agent Sales System.
+
+Please follow these simplified requirements:
+
+SYSTEM SUMMARY
+
+Backend: Laravel (latest stable)
+Database: MySQL
+Authentication: Laravel Sanctum (simple token-based auth)
+Frontends: 
+- Admin Panel (React, not included here)
+- Driver App (Flutter, not included here)
+
+I want a backend ONLY with:
+✔ Authentication (admin + driver)
+✔ Products & Categories
+✔ Warehouse stock
+✔ Assigning stock to drivers (car stock)
+✔ Driver selling items (simple sale process)
+✔ Simple digital invoice (PDF or even plain JSON)
+✔ Admin dashboard APIs for reporting basic stats
+✔ No complicated permissions, No roles beyond "admin" + "driver"
+✔ No websockets, No queues, No Docker, No complex DevOps
+✔ No advanced accounting (just very basic)
+
+
+FEATURES REQUIRED
+
+
+1. AUTHENTICATION
+- Admin and Driver login.
+- Token-based authentication using Sanctum.
+- Simple middleware: admin-only routes + driver-only routes.
+
+2. PRODUCTS
+- CRUD for products (admin only)
+  Fields: id, name, price, category_id, description, image(optional)
+- Category CRUD
+
+3. WAREHOUSE STOCK
+- Table: warehouse_stock (product_id, quantity)
+- Admin can update stock.
+- Basic validation: quantity cannot be negative.
+
+4. DRIVER (AGENT) STOCK
+- Table: driver_stock (driver_id, product_id, quantity)
+- Admin can assign stock to driver (increase driver_stock & decrease warehouse_stock)
+- Driver cannot change his own stock manually.
+
+5. SALES (driver sells from his car)
+- Driver selects product + quantity
+- System checks: driver_stock >= requested
+- Creates sale record:
+    sale: id, driver_id, customer_name, total_amount, created_at
+    sale_items: sale_id, product_id, quantity, price
+- Decrease driver_stock
+- System returns:
+    - sale_id
+    - list of items
+    - total_amount
+    - a simple invoice_number
+- Optional: Generate a simple PDF using DOMPDF (not required but nice)
+
+6. SIMPLE REPORTS (admin)
+- Endpoint that returns:
+    - total_products
+    - total_drivers
+    - total_sales
+    - total_revenue
+    - low_stock_products
+
+7. NO COMPLEXITY
+❌ No roles/permissions package  
+❌ No queues  
+❌ No complex accounting  
+❌ No payments/debts  
+❌ No warehouse transfers system  
+❌ No multi-warehouse structure  
+Just **one warehouse**, products, drivers, and car-stock.
+
+
+REQUIRED OUTPUT
+
+You must generate:
+
+✔ Laravel folder structure with:
+    - Models
+    - Migrations
+    - Controllers
+    - Routes (api.php)
+    - Middleware for admin/driver
+    - Seeders (admin user, test driver, sample data)
+
+✔ CRUD Controllers (Product, Category)
+✔ Stock Controllers (warehouse + driver)
+✔ SaleController with validation and logic
+✔ Simple invoice generator (PDF optional)
+✔ api.php routes commented and organized
+✔ README with steps:
+    1- composer install
+    2- copy .env
+    3- run migrations
+    4- run php artisan serve
+
+✔ Provide sample API requests (JSON)
+✔ No external complications
+
+
+API SUMMARY REQUIRED
+
+
+AUTH  
+- POST /api/login  
+- POST /api/logout  
+- GET /api/me  
+
+PRODUCTS  
+- GET /api/products  
+- POST /api/products  
+- PUT /api/products/{id}  
+- DELETE /api/products/{id}  
+
+CATEGORIES  
+- GET /api/categories  
+- POST /api/categories  
+
+STOCK  
+- GET /api/warehouse-stock  
+- POST /api/warehouse-stock/update  
+- GET /api/drivers/{id}/stock  
+- POST /api/assign-stock (admin → driver)  
+
+SALES  
+- POST /api/sales (driver creates sale)  
+- GET /api/sales/{id}  
+
+REPORTS  
+- GET /api/admin/stats  
+
+
+DATABASE TABLES NEEDED
+
+categories  
+products  
+warehouse_stock  
+drivers (extends users) or user with type field  
+driver_stock  
+sales  
+sale_items  
+users (id, name, email, password, type: admin/driver)
+
+
+END OF PROMPT
+
+
+Build everything cleanly and simply.
+
+
+---
+    

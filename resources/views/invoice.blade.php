@@ -70,7 +70,7 @@
         <div class="info-box">
             <h3>Sale Information</h3>
             <p><strong>Date:</strong> {{ $sale->created_at->format('Y-m-d H:i:s') }}</p>
-            <p><strong>Driver:</strong> {{ $sale->driver->name }}</p>
+            <p><strong>Driver:</strong> {{ $sale->driver ? $sale->driver->name : 'N/A' }}</p>
         </div>
     </div>
 

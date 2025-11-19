@@ -9,7 +9,30 @@ class ProductController extends Controller
 {
     public function index()
     {
-        $products = Product::with(['category', 'warehouseStock'])->get();
+        $products = Product::with(['category', 'warehouseStock'])
+            ->get()
+            ->map(function($product) {
+                $warehouseQuantity = $product->warehouseStock ? $product->warehouseStock->quantity : 0;
+                $totalDriverStock = $product->driverStock()->sum('quantity');
+                $totalSold = $product->saleItems()->sum('quantity');
+                
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'price' => $product->price,
+                    'category_id' => $product->category_id,
+                    'category' => $product->category,
+                    'description' => $product->description,
+                    'image' => $product->image,
+                    'warehouse_quantity' => $warehouseQuantity,
+                    'total_driver_stock' => $totalDriverStock,
+                    'total_sold' => $totalSold,
+                    'warehouse_stock' => $product->warehouseStock,
+                    'created_at' => $product->created_at,
+                    'updated_at' => $product->updated_at,
+                ];
+            });
+        
         return response()->json($products);
     }
 

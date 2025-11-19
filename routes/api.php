@@ -10,6 +10,8 @@ use App\Http\Controllers\DriverStockController;
 use App\Http\Controllers\AssignStockController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\AdminStatsController;
+use App\Http\Controllers\DriverController;
+use App\Http\Controllers\AdminSalesController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -73,13 +75,26 @@ Route::middleware(['auth:sanctum', 'driver'])->group(function () {
 });
 
 // ============================================
-// SALES ROUTES (Driver only)
+// SALES ROUTES
 // ============================================
+// Driver can create sales and view their own
 Route::middleware(['auth:sanctum', 'driver'])->group(function () {
     Route::post('/sales', [SaleController::class, 'store']);
     Route::get('/sales', [SaleController::class, 'index']); // Driver's own sales
+});
+
+// Both admin and driver can view sale details and invoice
+Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/sales/{id}', [SaleController::class, 'show']);
     Route::get('/sales/{id}/invoice', [SaleController::class, 'invoice']);
+});
+
+// Handle OPTIONS request for CORS preflight
+Route::options('/sales/{id}/invoice', function () {
+    return response('', 200)
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
 });
 
 // ============================================
@@ -87,4 +102,10 @@ Route::middleware(['auth:sanctum', 'driver'])->group(function () {
 // ============================================
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/stats', [AdminStatsController::class, 'index']);
+    Route::get('/admin/drivers', [DriverController::class, 'index']);
+    Route::post('/admin/drivers', [DriverController::class, 'store']);
+    Route::get('/admin/drivers/{id}', [DriverController::class, 'show']);
+    Route::put('/admin/drivers/{id}', [DriverController::class, 'update']);
+    Route::delete('/admin/drivers/{id}', [DriverController::class, 'destroy']);
+    Route::get('/admin/sales', [AdminSalesController::class, 'index']);
 });

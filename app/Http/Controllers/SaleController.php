@@ -128,9 +128,15 @@ class SaleController extends Controller
         return response()->json($sales);
     }
 
-    public function invoice(string $id)
+    public function invoice(Request $request, string $id)
     {
         $sale = Sale::with(['items.product', 'driver'])->findOrFail($id);
+        
+        // Check if user has access (admin or the driver who made the sale)
+        $user = $request->user();
+        if ($user->type !== 'admin' && $sale->driver_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
 
         $html = view('invoice', [
             'sale' => $sale,
@@ -145,6 +151,14 @@ class SaleController extends Controller
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
 
-        return $dompdf->stream("invoice-{$sale->invoice_number}.pdf");
+        $pdfContent = $dompdf->output();
+        
+        // Return PDF with CORS headers
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="invoice-'.$sale->invoice_number.'.pdf"')
+            ->header('Access-Control-Allow-Origin', '*')
+            ->header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     }
 }

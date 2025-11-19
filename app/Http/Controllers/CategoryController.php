@@ -9,7 +9,24 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $categories = Category::with('products')->get();
+        $categories = Category::with('products')
+            ->get()
+            ->map(function($category) {
+                $productCount = $category->products()->count();
+                $totalValue = $category->products()->sum('price');
+                
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'description' => $category->description,
+                    'product_count' => $productCount,
+                    'total_value' => (float) $totalValue,
+                    'products' => $category->products,
+                    'created_at' => $category->created_at,
+                    'updated_at' => $category->updated_at,
+                ];
+            });
+        
         return response()->json($categories);
     }
 

@@ -2,12 +2,13 @@
 	"info": {
 		"_postman_id": "inventory-backend-collection",
 		"name": "Inventory Backend API",
-		"description": "Complete API collection for Warehouse + Delivery Agent Sales System",
+		"description": "Complete API collection for Warehouse + Delivery Agent Sales System with detailed field descriptions",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
 			"name": "Authentication",
+			"description": "Authentication endpoints for user login and session management",
 			"item": [
 				{
 					"name": "Login (General)",
@@ -32,7 +33,8 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							}
 						],
 						"body": {
@@ -41,12 +43,14 @@
 								{
 									"key": "email",
 									"value": "admin@inventory.com",
-									"type": "text"
+									"type": "text",
+									"description": "User email address (required, must be valid email format)"
 								},
 								{
 									"key": "password",
 									"value": "password",
-									"type": "text"
+									"type": "text",
+									"description": "User password (required, plain text, will be validated)"
 								}
 							]
 						},
@@ -60,7 +64,7 @@
 								"login"
 							]
 						},
-						"description": "General login for admin or driver"
+						"description": "General login endpoint for both admin and driver users. Returns authentication token and user information."
 					},
 					"response": []
 				},
@@ -88,7 +92,8 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							}
 						],
 						"body": {
@@ -97,12 +102,14 @@
 								{
 									"key": "email",
 									"value": "{{driver_email}}",
-									"type": "text"
+									"type": "text",
+									"description": "Driver email address (required, must be valid email format, user must be of type 'driver')"
 								},
 								{
 									"key": "password",
 									"value": "{{driver_password}}",
-									"type": "text"
+									"type": "text",
+									"description": "Driver password (required, plain text, will be validated)"
 								}
 							]
 						},
@@ -117,7 +124,7 @@
 								"login"
 							]
 						},
-						"description": "Driver specific login - validates driver account"
+						"description": "Driver-specific login endpoint. Validates that the user is of type 'driver' before allowing login. Returns 403 if user is not a driver."
 					},
 					"response": []
 				},
@@ -144,7 +151,8 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							}
 						],
 						"body": {
@@ -153,12 +161,14 @@
 								{
 									"key": "email",
 									"value": "{{admin_email}}",
-									"type": "text"
+									"type": "text",
+									"description": "Admin email address (required, must be valid email format, user must be of type 'admin')"
 								},
 								{
 									"key": "password",
 									"value": "{{admin_password}}",
-									"type": "text"
+									"type": "text",
+									"description": "Admin password (required, plain text, will be validated)"
 								}
 							]
 						},
@@ -173,7 +183,7 @@
 								"login"
 							]
 						},
-						"description": "Admin specific login - validates admin account"
+						"description": "Admin-specific login endpoint. Validates that the user is of type 'admin' before allowing login. Returns 403 if user is not an admin."
 					},
 					"response": []
 				},
@@ -184,12 +194,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, obtained from login endpoints)"
 							}
 						],
 						"url": {
@@ -202,7 +214,7 @@
 								"logout"
 							]
 						},
-						"description": "Logout and invalidate token"
+						"description": "Logout endpoint. Invalidates the current access token. Requires authentication."
 					},
 					"response": []
 				},
@@ -213,12 +225,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, obtained from login endpoints)"
 							}
 						],
 						"url": {
@@ -231,15 +245,15 @@
 								"me"
 							]
 						},
-						"description": "Get current authenticated user information"
+						"description": "Get current authenticated user information. Returns user object with id, name, email, type, and timestamps. Requires authentication."
 					},
 					"response": []
 				}
-			],
-			"description": "Authentication endpoints"
+			]
 		},
 		{
 			"name": "Categories",
+			"description": "Category management endpoints (Admin only). Categories group products together for better organization.",
 			"item": [
 				{
 					"name": "Get All Categories",
@@ -248,12 +262,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"url": {
@@ -266,7 +282,7 @@
 								"categories"
 							]
 						},
-						"description": "Get all categories (Admin only)"
+						"description": "Get all categories with their associated products. Returns categories with product_count, total_value, and nested products array. Admin only."
 					},
 					"response": []
 				},
@@ -277,12 +293,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"body": {
@@ -291,12 +309,14 @@
 								{
 									"key": "name",
 									"value": "أكياس التسوق",
-									"type": "text"
+									"type": "text",
+									"description": "Category name (required, string, max 255 characters)"
 								},
 								{
 									"key": "description",
 									"value": "أكياس التسوق البلاستيكية بأنواعها المختلفة",
-									"type": "text"
+									"type": "text",
+									"description": "Category description (optional, string, can be null)"
 								}
 							]
 						},
@@ -310,7 +330,7 @@
 								"categories"
 							]
 						},
-						"description": "Create a new category (Admin only)"
+						"description": "Create a new category. Returns the created category object with id, name, description, and timestamps. Admin only."
 					},
 					"response": []
 				},
@@ -321,12 +341,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"body": {
@@ -335,12 +357,14 @@
 								{
 									"key": "name",
 									"value": "أكياس التسوق - محدث",
-									"type": "text"
+									"type": "text",
+									"description": "Category name (optional if updating, string, max 255 characters)"
 								},
 								{
 									"key": "description",
 									"value": "وصف محدث للفئة",
-									"type": "text"
+									"type": "text",
+									"description": "Category description (optional, string, can be null)"
 								}
 							]
 						},
@@ -355,7 +379,7 @@
 								"{{category_id}}"
 							]
 						},
-						"description": "Update a category (Admin only)"
+						"description": "Update an existing category. All fields are optional (partial update). Returns the updated category object. Admin only. Returns 404 if category not found."
 					},
 					"response": []
 				},
@@ -366,12 +390,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"url": {
@@ -383,17 +409,24 @@
 								"api",
 								"categories",
 								"{{category_id}}"
+							],
+							"variable": [
+								{
+									"key": "category_id",
+									"value": "1",
+									"description": "Category ID (required, integer, must exist in database)"
+								}
 							]
 						},
-						"description": "Delete a category (Admin only)"
+						"description": "Delete a category by ID. Returns success message. Admin only. Returns 404 if category not found."
 					},
 					"response": []
 				}
-			],
-			"description": "Category management endpoints (Admin only)"
+			]
 		},
 		{
 			"name": "Products",
+			"description": "Product management endpoints (Admin only). Products are items that can be sold and tracked in inventory.",
 			"item": [
 				{
 					"name": "Get All Products",
@@ -402,12 +435,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"url": {
@@ -420,7 +455,7 @@
 								"products"
 							]
 						},
-						"description": "Get all products (Admin only)"
+						"description": "Get all products with their categories, warehouse stock, driver stock totals, and total sold quantities. Returns comprehensive product information. Admin only."
 					},
 					"response": []
 				},
@@ -431,12 +466,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"body": {
@@ -445,27 +482,32 @@
 								{
 									"key": "name",
 									"value": "كيس تسوق كبير",
-									"type": "text"
+									"type": "text",
+									"description": "Product name (required, string, max 255 characters)"
 								},
 								{
 									"key": "price",
 									"value": "2.50",
-									"type": "text"
+									"type": "text",
+									"description": "Product price (required, numeric, minimum 0, decimal with 2 decimal places)"
 								},
 								{
 									"key": "category_id",
 									"value": "1",
-									"type": "text"
+									"type": "text",
+									"description": "Category ID (required, integer, must exist in categories table)"
 								},
 								{
 									"key": "description",
 									"value": "كيس تسوق بلاستيكي كبير الحجم، مناسب للاستخدام المتكرر",
-									"type": "text"
+									"type": "text",
+									"description": "Product description (optional, string, can be null)"
 								},
 								{
 									"key": "image",
 									"value": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
-									"type": "text"
+									"type": "text",
+									"description": "Product image URL (optional, string, can be null, should be a valid URL)"
 								}
 							]
 						},
@@ -479,7 +521,7 @@
 								"products"
 							]
 						},
-						"description": "Create a new product (Admin only)"
+						"description": "Create a new product. Automatically creates an initial warehouse stock entry with quantity 0. Returns the created product with category and warehouse stock relations. Admin only."
 					},
 					"response": []
 				},
@@ -490,12 +532,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"body": {
@@ -504,17 +548,32 @@
 								{
 									"key": "name",
 									"value": "كيس تسوق كبير - محدث",
-									"type": "text"
+									"type": "text",
+									"description": "Product name (optional if updating, string, max 255 characters)"
 								},
 								{
 									"key": "price",
 									"value": "3.00",
-									"type": "text"
+									"type": "text",
+									"description": "Product price (optional if updating, numeric, minimum 0, decimal with 2 decimal places)"
+								},
+								{
+									"key": "category_id",
+									"value": "1",
+									"type": "text",
+									"description": "Category ID (optional if updating, integer, must exist in categories table)"
 								},
 								{
 									"key": "description",
 									"value": "كيس تسوق محدث بجودة أعلى",
-									"type": "text"
+									"type": "text",
+									"description": "Product description (optional, string, can be null)"
+								},
+								{
+									"key": "image",
+									"value": "https://example.com/new-image.jpg",
+									"type": "text",
+									"description": "Product image URL (optional, string, can be null, should be a valid URL)"
 								}
 							]
 						},
@@ -527,9 +586,16 @@
 								"api",
 								"products",
 								"{{product_id}}"
+							],
+							"variable": [
+								{
+									"key": "product_id",
+									"value": "1",
+									"description": "Product ID (required, integer, must exist in database)"
+								}
 							]
 						},
-						"description": "Update a product (Admin only)"
+						"description": "Update an existing product. All fields are optional (partial update). Returns the updated product with category and warehouse stock relations. Admin only. Returns 404 if product not found."
 					},
 					"response": []
 				},
@@ -540,12 +606,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"url": {
@@ -557,17 +625,24 @@
 								"api",
 								"products",
 								"{{product_id}}"
+							],
+							"variable": [
+								{
+									"key": "product_id",
+									"value": "1",
+									"description": "Product ID (required, integer, must exist in database)"
+								}
 							]
 						},
-						"description": "Delete a product (Admin only)"
+						"description": "Delete a product by ID. Returns success message. Admin only. Returns 404 if product not found."
 					},
 					"response": []
 				}
-			],
-			"description": "Product management endpoints (Admin only)"
+			]
 		},
 		{
 			"name": "Warehouse Stock",
+			"description": "Warehouse stock management endpoints (Admin only). Tracks inventory quantities available in the main warehouse.",
 			"item": [
 				{
 					"name": "Get All Warehouse Stock",
@@ -576,12 +651,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"url": {
@@ -594,7 +671,7 @@
 								"warehouse-stock"
 							]
 						},
-						"description": "Get all warehouse stock (Admin only)"
+						"description": "Get all warehouse stock entries with product and category information. Returns array of stock objects with product_id, quantity, and nested product/category data. Admin only."
 					},
 					"response": []
 				},
@@ -605,12 +682,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"body": {
@@ -619,12 +698,14 @@
 								{
 									"key": "product_id",
 									"value": "1",
-									"type": "text"
+									"type": "text",
+									"description": "Product ID (required, integer, must exist in products table)"
 								},
 								{
 									"key": "quantity",
 									"value": "500",
-									"type": "text"
+									"type": "text",
+									"description": "Stock quantity (required, integer, minimum 0, sets the warehouse stock for this product)"
 								}
 							]
 						},
@@ -639,15 +720,15 @@
 								"update"
 							]
 						},
-						"description": "Update warehouse stock quantity (Admin only)"
+						"description": "Update or create warehouse stock for a product. Uses updateOrCreate, so it will create if it doesn't exist or update if it does. Returns the stock object with product relation. Admin only."
 					},
 					"response": []
 				}
-			],
-			"description": "Warehouse stock management endpoints (Admin only)"
+			]
 		},
 		{
 			"name": "Driver Stock",
+			"description": "Driver stock management endpoints. Track inventory assigned to drivers for sales.",
 			"item": [
 				{
 					"name": "Get Driver Stock",
@@ -656,12 +737,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"url": {
@@ -674,9 +757,16 @@
 								"drivers",
 								"{{driver_id}}",
 								"stock"
+							],
+							"variable": [
+								{
+									"key": "driver_id",
+									"value": "2",
+									"description": "Driver ID (required, integer, must exist and be of type 'driver')"
+								}
 							]
 						},
-						"description": "Get driver's stock (Admin only)"
+						"description": "Get stock for a specific driver. Returns array of driver stock entries with product and category information. Returns 400 if user is not a driver. Admin only."
 					},
 					"response": []
 				},
@@ -687,12 +777,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"body": {
@@ -701,17 +793,20 @@
 								{
 									"key": "driver_id",
 									"value": "2",
-									"type": "text"
+									"type": "text",
+									"description": "Driver ID (required, integer, must exist and be of type 'driver')"
 								},
 								{
 									"key": "product_id",
 									"value": "1",
-									"type": "text"
+									"type": "text",
+									"description": "Product ID (required, integer, must exist in products table)"
 								},
 								{
 									"key": "quantity",
 									"value": "50",
-									"type": "text"
+									"type": "text",
+									"description": "Quantity to assign (required, integer, minimum 1, must be available in warehouse stock)"
 								}
 							]
 						},
@@ -725,7 +820,7 @@
 								"assign-stock"
 							]
 						},
-						"description": "Assign stock from warehouse to driver (Admin only)"
+						"description": "Assign stock from warehouse to a driver. Decreases warehouse stock and increases driver stock. Returns 400 if insufficient warehouse stock or if user is not a driver. Returns the updated driver stock with product and driver relations. Admin only."
 					},
 					"response": []
 				},
@@ -736,12 +831,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be driver)"
 							}
 						],
 						"url": {
@@ -755,118 +852,132 @@
 								"my-stock"
 							]
 						},
-						"description": "Get driver's own stock (Driver only)"
+						"description": "Get the authenticated driver's own stock. Returns array of driver stock entries with product and category information. Driver only."
 					},
 					"response": []
 				}
-			],
-			"description": "Driver stock management endpoints"
+			]
 		},
-			{
-				"name": "Sales",
-				"item": [
-					{
-						"name": "Create Sale",
-						"request": {
-							"method": "POST",
-							"header": [
-								{
-									"key": "Accept",
-									"value": "application/json"
-								},
-								{
-									"key": "Authorization",
-									"value": "Bearer {{auth_token}}",
-									"type": "text"
-								},
-								{
-									"key": "Content-Type",
-									"value": "application/json",
-									"type": "text"
-								}
-							],
-							"body": {
-								"mode": "raw",
-								"raw": "{\n    \"customer_name\": \"عبدالرحمن أحمد\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 10\n        },\n        {\n            \"product_id\": 2,\n            \"quantity\": 5\n        }\n    ]\n}",
-								"options": {
-									"raw": {
-										"language": "json"
-									}
-								}
+		{
+			"name": "Sales",
+			"description": "Sales management endpoints. Drivers can create sales, both drivers and admins can view sales.",
+			"item": [
+				{
+					"name": "Create Sale",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
-							"url": {
-								"raw": "{{base_url}}/api/sales",
-								"host": [
-									"{{base_url}}"
-								],
-								"path": [
-									"api",
-									"sales"
-								]
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be driver)"
 							},
-							"description": "Create a new sale (Driver only)"
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text",
+								"description": "Content type for JSON body"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_name\": \"عبدالرحمن أحمد\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 10\n        },\n        {\n            \"product_id\": 2,\n            \"quantity\": 5\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
-						"response": []
-					},
-					{
-						"name": "Get My Sales (Driver)",
-						"request": {
-							"method": "GET",
-							"header": [
-								{
-									"key": "Accept",
-									"value": "application/json"
-								},
-								{
-									"key": "Authorization",
-									"value": "Bearer {{auth_token}}",
-									"type": "text"
-								}
+						"url": {
+							"raw": "{{base_url}}/api/sales",
+							"host": [
+								"{{base_url}}"
 							],
-							"url": {
-								"raw": "{{base_url}}/api/sales",
-								"host": [
-									"{{base_url}}"
-								],
-								"path": [
-									"api",
-									"sales"
-								]
-							},
-							"description": "Get all driver's sales (Driver only)"
+							"path": [
+								"api",
+								"sales"
+							]
 						},
-						"response": []
+						"description": "Create a new sale. Validates driver stock availability, calculates total amount, creates invoice number, and decreases driver stock. Returns sale details with items. Driver only. Returns 400 if insufficient stock.\n\nRequest Body Fields:\n- customer_name (required, string, max 255): Name of the customer\n- items (required, array, min 1): Array of sale items\n  - product_id (required, integer): Product ID that must exist\n  - quantity (required, integer, min 1): Quantity to sell"
 					},
-					{
-						"name": "Get Sale Details",
-						"request": {
-							"method": "GET",
-							"header": [
-								{
-									"key": "Accept",
-									"value": "application/json"
-								},
-								{
-									"key": "Authorization",
-									"value": "Bearer {{auth_token}}",
-									"type": "text"
-								}
+					"response": []
+				},
+				{
+					"name": "Get My Sales (Driver)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be driver)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/sales",
+							"host": [
+								"{{base_url}}"
 							],
-							"url": {
-								"raw": "{{base_url}}/api/sales/{{sale_id}}",
-								"host": [
-									"{{base_url}}"
-								],
-								"path": [
-									"api",
-									"sales",
-									"{{sale_id}}"
-								]
-							},
-							"description": "Get sale details (Driver only)"
+							"path": [
+								"api",
+								"sales"
+							]
 						},
-						"response": []
+						"description": "Get all sales created by the authenticated driver. Returns array of sales with items and product information, ordered by creation date (newest first). Driver only."
 					},
+					"response": []
+				},
+				{
+					"name": "Get Sale Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, admin or driver who made the sale)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/sales/{{sale_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sales",
+								"{{sale_id}}"
+							],
+							"variable": [
+								{
+									"key": "sale_id",
+									"value": "1",
+									"description": "Sale ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Get detailed information about a specific sale. Returns sale with items, product information, and driver name. Available to both admin and the driver who created the sale. Returns 404 if sale not found."
+					},
+					"response": []
+				},
 				{
 					"name": "Get Sale Invoice PDF",
 					"request": {
@@ -875,7 +986,8 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, admin or driver who made the sale)"
 							}
 						],
 						"url": {
@@ -888,17 +1000,298 @@
 								"sales",
 								"{{sale_id}}",
 								"invoice"
+							],
+							"variable": [
+								{
+									"key": "sale_id",
+									"value": "1",
+									"description": "Sale ID (required, integer, must exist in database)"
+								}
 							]
 						},
-						"description": "Get sale invoice as PDF (Driver only)"
+						"description": "Generate and return a PDF invoice for a specific sale. Returns PDF file with invoice details. Available to both admin and the driver who created the sale. Returns 403 if unauthorized, 404 if sale not found. Response Content-Type: application/pdf."
 					},
 					"response": []
 				}
-			],
-			"description": "Sales endpoints (Driver only)"
+			]
+		},
+		{
+			"name": "Admin - Drivers",
+			"description": "Driver management endpoints (Admin only). Create, view, update, and delete drivers.",
+			"item": [
+				{
+					"name": "Get All Drivers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/drivers",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"drivers"
+							]
+						},
+						"description": "Get all drivers with their statistics (total_sales, total_revenue, total_stock_items). Returns array of driver objects. Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Driver",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "سائق جديد",
+									"type": "text",
+									"description": "Driver name (required, string, max 255 characters)"
+								},
+								{
+									"key": "email",
+									"value": "driver@example.com",
+									"type": "text",
+									"description": "Driver email (required, valid email format, must be unique)"
+								},
+								{
+									"key": "password",
+									"value": "password123",
+									"type": "text",
+									"description": "Driver password (required, string, minimum 6 characters, will be hashed)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/drivers",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"drivers"
+							]
+						},
+						"description": "Create a new driver account. Automatically sets user type to 'driver'. Returns created driver object (without password). Admin only. Returns 422 if email already exists."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Driver Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/drivers/{{driver_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"drivers",
+								"{{driver_id}}"
+							],
+							"variable": [
+								{
+									"key": "driver_id",
+									"value": "2",
+									"description": "Driver ID (required, integer, must exist and be of type 'driver')"
+								}
+							]
+						},
+						"description": "Get detailed information about a specific driver including statistics (total_sales, total_revenue, total_stock_items). Returns driver object with stats. Admin only. Returns 404 if driver not found."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Driver",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "سائق محدث",
+									"type": "text",
+									"description": "Driver name (optional if updating, string, max 255 characters)"
+								},
+								{
+									"key": "email",
+									"value": "updated@example.com",
+									"type": "text",
+									"description": "Driver email (optional if updating, valid email format, must be unique if provided)"
+								},
+								{
+									"key": "password",
+									"value": "newpassword123",
+									"type": "text",
+									"description": "Driver password (optional if updating, string, minimum 6 characters, will be hashed)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/drivers/{{driver_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"drivers",
+								"{{driver_id}}"
+							],
+							"variable": [
+								{
+									"key": "driver_id",
+									"value": "2",
+									"description": "Driver ID (required, integer, must exist and be of type 'driver')"
+								}
+							]
+						},
+						"description": "Update an existing driver. All fields are optional (partial update). Password will be hashed if provided. Returns updated driver object (without password). Admin only. Returns 404 if driver not found, 422 if email conflict."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Driver",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/drivers/{{driver_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"drivers",
+								"{{driver_id}}"
+							],
+							"variable": [
+								{
+									"key": "driver_id",
+									"value": "2",
+									"description": "Driver ID (required, integer, must exist and be of type 'driver')"
+								}
+							]
+						},
+						"description": "Delete a driver by ID. Returns success message. Admin only. Returns 404 if driver not found."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin - Sales",
+			"description": "Admin sales management endpoints. View all sales across all drivers.",
+			"item": [
+				{
+					"name": "Get All Sales",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/sales",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"sales"
+							]
+						},
+						"description": "Get all sales across all drivers. Returns array of sales with driver information and items with product details, ordered by creation date (newest first). Admin only."
+					},
+					"response": []
+				}
+			]
 		},
 		{
 			"name": "Admin Stats",
+			"description": "Admin dashboard statistics endpoints. Provides comprehensive analytics and metrics.",
 			"item": [
 				{
 					"name": "Get Dashboard Stats",
@@ -907,12 +1300,14 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
+								"value": "application/json",
+								"description": "Accept JSON response format"
 							},
 							{
 								"key": "Authorization",
 								"value": "Bearer {{auth_token}}",
-								"type": "text"
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
 							}
 						],
 						"url": {
@@ -926,15 +1321,15 @@
 								"stats"
 							]
 						},
-						"description": "Get admin dashboard statistics (Admin only)"
+						"description": "Get comprehensive dashboard statistics. Returns:\n- total_products: Total number of products\n- total_drivers: Total number of drivers\n- total_sales: Total number of sales\n- total_revenue: Sum of all sales amounts\n- today_sales: Number of sales today\n- today_revenue: Revenue from today's sales\n- low_stock_products: Products with warehouse quantity < 10 (array with product_id, product_name, quantity)\n- sales_by_day: Sales statistics for last 7 days (date, count, revenue)\n- top_drivers: Top 5 drivers by sales count (id, name, total_sales, total_revenue)\n\nAdmin only."
 					},
 					"response": []
 				}
-			],
-			"description": "Admin statistics endpoints"
+			]
 		},
 		{
 			"name": "Health Check",
+			"description": "System health and status endpoints.",
 			"item": [
 				{
 					"name": "Health Check",
@@ -951,45 +1346,49 @@
 								"health"
 							]
 						},
-						"description": "Check API health status"
+						"description": "Check API health status. Returns status, message, and current timestamp. No authentication required. Useful for monitoring and load balancer health checks.\n\nResponse Fields:\n- status: 'ok' if API is running\n- message: Status message\n- timestamp: Current server time in ISO8601 format"
 					},
 					"response": []
 				}
-			],
-			"description": "Health check endpoint"
+			]
 		}
 	],
 	"variable": [
 		{
 			"key": "base_url",
 			"value": "http://localhost:8000",
-			"type": "string"
+			"type": "string",
+			"description": "Base URL for the API server"
 		},
 		{
 			"key": "auth_token",
 			"value": "",
-			"type": "string"
+			"type": "string",
+			"description": "Authentication token obtained from login endpoints"
 		},
 		{
 			"key": "product_id",
 			"value": "1",
-			"type": "string"
+			"type": "string",
+			"description": "Product ID for testing (integer as string)"
 		},
 		{
 			"key": "driver_id",
 			"value": "2",
-			"type": "string"
+			"type": "string",
+			"description": "Driver ID for testing (integer as string)"
 		},
 		{
 			"key": "sale_id",
 			"value": "1",
-			"type": "string"
+			"type": "string",
+			"description": "Sale ID for testing (integer as string)"
 		},
 		{
 			"key": "category_id",
 			"value": "1",
-			"type": "string"
+			"type": "string",
+			"description": "Category ID for testing (integer as string)"
 		}
 	]
 }
-

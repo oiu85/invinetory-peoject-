@@ -43,4 +43,9 @@ class Product extends Model
     {
         return $this->hasMany(SaleItem::class);
     }
+
+    public function productDimension(): HasOne
+    {
+        return $this->hasOne(ProductDimension::class);
+    }
 }

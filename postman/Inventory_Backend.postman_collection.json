@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "inventory-backend-collection",
 		"name": "Inventory Backend API",
-		"description": "Complete API collection for Warehouse + Delivery Agent Sales System with detailed field descriptions",
+		"description": "Complete API collection for Warehouse + Delivery Agent Sales System with Room Simulation and Storage Suggestions. Includes detailed field descriptions and automatic storage suggestions with vertical stacking support.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -677,6 +677,22 @@
 				},
 				{
 					"name": "Update Warehouse Stock",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.storage_suggestions) {",
+									"        pm.environment.set(\"room_id\", jsonData.storage_suggestions.recommended_room?.room_id || \"\");",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -705,7 +721,7 @@
 									"key": "quantity",
 									"value": "500",
 									"type": "text",
-									"description": "Stock quantity (required, integer, minimum 0, sets the warehouse stock for this product)"
+									"description": "Stock quantity (required, integer, minimum 0, sets the warehouse stock for this product). If quantity is increased, automatic storage suggestions will be included in response."
 								}
 							]
 						},
@@ -720,7 +736,125 @@
 								"update"
 							]
 						},
-						"description": "Update or create warehouse stock for a product. Uses updateOrCreate, so it will create if it doesn't exist or update if it does. Returns the stock object with product relation. Admin only."
+						"description": "Update or create warehouse stock for a product. Uses updateOrCreate, so it will create if it doesn't exist or update if it does. Returns the stock object with product relation. If quantity is increased, automatic storage suggestions with vertical stacking information will be included in the response. Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Storage Suggestions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/warehouse-stock/{{product_id}}/suggest-storage",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"warehouse-stock",
+								"{{product_id}}",
+								"suggest-storage"
+							],
+							"variable": [
+								{
+									"key": "product_id",
+									"value": "1",
+									"description": "Product ID (required, integer, must exist in products table)"
+								}
+							]
+						},
+						"description": "Get storage suggestions for a product based on current warehouse stock. Returns recommended room, placement options with vertical stacking information, and alternative rooms. Requires product dimensions to be set. Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Storage Suggestion",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"room_id\": 1,\n    \"product_id\": 1,\n    \"x_position\": 0,\n    \"y_position\": 0,\n    \"z_position\": 90,\n    \"quantity\": 7\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/warehouse-stock/apply-suggestion",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"warehouse-stock",
+								"apply-suggestion"
+							]
+						},
+						"description": "Apply a storage suggestion to automatically place items in a room. Creates item placements with vertical stacking support. Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending Suggestions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/warehouse-stock/pending-suggestions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"warehouse-stock",
+								"pending-suggestions"
+							]
+						},
+						"description": "Get all products with warehouse stock that need storage suggestions. Returns list of products with stock quantities and whether they have dimensions defined. Admin only."
 					},
 					"response": []
 				}
@@ -1328,6 +1462,1062 @@
 			]
 		},
 		{
+			"name": "Room Management",
+			"description": "Room management endpoints (Admin only). Rooms represent physical storage spaces in warehouses with 3D dimensions.",
+			"item": [
+				{
+					"name": "Get All Rooms",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms"
+							]
+						},
+						"description": "Get all rooms with warehouse information. Returns array of room objects with dimensions (width, depth, height in cm), status, and warehouse relation. Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Room",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"room_id\", jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Main Storage Room A\",\n    \"description\": \"Primary storage room for general products\",\n    \"width\": 1000,\n    \"depth\": 800,\n    \"height\": 300,\n    \"warehouse_id\": 1,\n    \"status\": \"active\",\n    \"max_weight\": 10000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/rooms",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms"
+							]
+						},
+						"description": "Create a new room. Dimensions are in centimeters (cm). Returns the created room object with warehouse relation. Admin only.\n\nRequest Body Fields:\n- name (required, string): Room name\n- width (required, numeric, min: 1): Room width in cm\n- depth (required, numeric, min: 1): Room depth in cm\n- height (required, numeric, min: 1): Room height in cm\n- warehouse_id (optional, integer): Warehouse ID\n- description (optional, string): Room description\n- status (optional, enum): 'active', 'inactive', or 'maintenance'\n- max_weight (optional, numeric): Maximum weight capacity in kg"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Room Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Get detailed information about a specific room including layouts. Returns room object with warehouse and layouts relations. Admin only. Returns 404 if room not found."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Room",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Room Name\",\n    \"width\": 1200,\n    \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Update an existing room. All fields are optional (partial update). Returns the updated room object. Admin only. Returns 404 if room not found."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Room",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Delete a room by ID. Returns success message. Admin only. Returns 404 if room not found."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Room Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/stats",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"stats"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Get statistics for a specific room including dimensions, volume, floor area, and latest layout information. Returns room stats with utilization data. Admin only."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Product Dimensions",
+			"description": "Product dimensions management endpoints (Admin only). Define physical dimensions (width, depth, height) for products to enable room simulation and storage suggestions.",
+			"item": [
+				{
+					"name": "Get All Product Dimensions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/products/dimensions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"dimensions"
+							]
+						},
+						"description": "Get all products with their dimensions. Returns array of product dimension objects with product relation. Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Product Dimensions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}/dimensions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}",
+								"dimensions"
+							],
+							"variable": [
+								{
+									"key": "product_id",
+									"value": "1",
+									"description": "Product ID (required, integer, must exist in products table)"
+								}
+							]
+						},
+						"description": "Get dimensions for a specific product. Returns product dimension object with product relation. Admin only. Returns 404 if dimensions not found."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product Dimensions",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"width\": 50,\n    \"depth\": 50,\n    \"height\": 30,\n    \"weight\": 5,\n    \"rotatable\": true,\n    \"fragile\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}/dimensions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}",
+								"dimensions"
+							],
+							"variable": [
+								{
+									"key": "product_id",
+									"value": "1",
+									"description": "Product ID (required, integer, must exist in products table)"
+								}
+							]
+						},
+						"description": "Create dimensions for a product. Dimensions are in centimeters (cm), weight in kilograms (kg). Returns the created dimension object. Admin only. Returns 400 if dimensions already exist.\n\nRequest Body Fields:\n- width (required, numeric, min: 0.01): Product width in cm\n- depth (required, numeric, min: 0.01): Product depth in cm\n- height (required, numeric, min: 0.01): Product height in cm\n- weight (optional, numeric, min: 0): Product weight in kg\n- rotatable (optional, boolean): Whether item can be rotated (default: true)\n- fragile (optional, boolean): Whether item is fragile (default: false)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product Dimensions",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"width\": 60,\n    \"depth\": 60,\n    \"height\": 35,\n    \"weight\": 6\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}/dimensions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}",
+								"dimensions"
+							],
+							"variable": [
+								{
+									"key": "product_id",
+									"value": "1",
+									"description": "Product ID (required, integer, must exist in products table)"
+								}
+							]
+						},
+						"description": "Update dimensions for a product. All fields are optional (partial update). Returns the updated dimension object. Admin only. Returns 404 if dimensions not found."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Product Dimensions",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}/dimensions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}",
+								"dimensions"
+							],
+							"variable": [
+								{
+									"key": "product_id",
+									"value": "1",
+									"description": "Product ID (required, integer, must exist in products table)"
+								}
+							]
+						},
+						"description": "Delete dimensions for a product. Returns success message. Admin only. Returns 404 if dimensions not found."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Room Layouts",
+			"description": "Room layout generation and management endpoints (Admin only). Generate optimal 3D layouts using LAFF + MaxRects algorithm with vertical stacking support.",
+			"item": [
+				{
+					"name": "Generate Layout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"layout_id\", jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"algorithm\": \"laff_maxrects\",\n    \"allow_rotation\": true,\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 5,\n            \"dimensions\": {\n                \"width\": 50,\n                \"depth\": 50,\n                \"height\": 30\n            }\n        },\n        {\n            \"product_id\": 2,\n            \"quantity\": 10,\n            \"dimensions\": {\n                \"width\": 40,\n                \"depth\": 40,\n                \"height\": 25\n            }\n        }\n    ],\n    \"options\": {\n        \"max_layers\": null,\n        \"prefer_bottom\": true,\n        \"minimize_height\": false\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/generate-layout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"generate-layout"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Generate an optimal 3D layout for a room using LAFF + MaxRects algorithm. Automatically handles vertical stacking of same products. Returns layout with placements, utilization percentage, and unplaced items. Admin only.\n\nRequest Body Fields:\n- algorithm (optional, string): 'laff_maxrects', 'maxrects', or 'skyline' (default: 'laff_maxrects')\n- allow_rotation (optional, boolean): Allow item rotation (default: true)\n- items (required, array): Array of items to place\n  - product_id (required, integer): Product ID\n  - quantity (required, integer, min: 1): Number of items\n  - dimensions (optional, object): Override product dimensions\n    - width, depth, height (numeric): Dimensions in cm\n- options (optional, object): Algorithm options\n  - max_layers (optional, integer): Maximum vertical layers\n  - prefer_bottom (optional, boolean): Prefer bottom placement (default: true)\n  - minimize_height (optional, boolean): Minimize total height"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current Layout",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/layout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"layout"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Get the latest layout for a room. Returns layout object with placements, utilization data, and algorithm information. Admin only. Returns 404 if no layout found."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Layout",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"layout_data\": {\n        \"version\": \"1.0\",\n        \"algorithm\": \"laff_maxrects\",\n        \"utilization\": 85.5,\n        \"placements\": []\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/layout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"layout"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Update layout data manually. Updates the layout_data JSON field. Admin only. Returns 404 if no layout found."
+					},
+					"response": []
+				},
+				{
+					"name": "Optimize Layout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/layout/optimize",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"layout",
+								"optimize"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Re-optimize an existing layout. Regenerates layout using current placements to improve space utilization. Returns optimized layout. Admin only. Returns 404 if no layout found."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Layout",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/layout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"layout"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Delete the latest layout for a room. Returns success message. Admin only. Returns 404 if no layout found."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Placements",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/placements",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"placements"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Get all item placements for a room's latest layout. Returns array of placement objects with product information and 3D coordinates (x, y, z). Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Manual Placement",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"product_id\": 1,\n    \"x_position\": 0,\n    \"y_position\": 0,\n    \"z_position\": 0,\n    \"width\": 50,\n    \"depth\": 50,\n    \"height\": 30,\n    \"rotation\": \"0\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/placements",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"placements"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Manually add an item placement to a room's layout. Coordinates are in centimeters (cm). Z=0 is ground level. Admin only.\n\nRequest Body Fields:\n- product_id (required, integer): Product ID\n- x_position (required, numeric, min: 0): X coordinate in cm (from left wall)\n- y_position (required, numeric, min: 0): Y coordinate in cm (from front wall)\n- z_position (required, numeric, min: 0): Z coordinate in cm (from floor, ground level = 0)\n- width (required, numeric, min: 0.01): Item width in cm\n- depth (required, numeric, min: 0.01): Item depth in cm\n- height (required, numeric, min: 0.01): Item height in cm\n- rotation (optional, enum): '0', '90', '180', or '270' (default: '0')"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Placement",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"x_position\": 100,\n    \"y_position\": 100,\n    \"z_position\": 30\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/placements/{{placement_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"placements",
+								"{{placement_id}}"
+							],
+							"variable": [
+								{
+									"key": "placement_id",
+									"value": "1",
+									"description": "Placement ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Update an item placement position or dimensions. All fields are optional (partial update). Admin only. Returns 404 if placement not found."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Placement",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/placements/{{placement_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"placements",
+								"{{placement_id}}"
+							],
+							"variable": [
+								{
+									"key": "placement_id",
+									"value": "1",
+									"description": "Placement ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Delete an item placement. Returns success message. Admin only. Returns 404 if placement not found."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Room Visualization",
+			"description": "Room visualization endpoints (Admin only). Get layout data in various formats for frontend rendering (2D, 3D, grid).",
+			"item": [
+				{
+					"name": "Get Visualization Data",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/visualization",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"visualization"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Get complete visualization data for a room's latest layout. Returns room dimensions, layout information, and all placements with product details. Includes stack information for vertical stacking visualization. Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Grid Visualization",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/visualization/grid",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"visualization",
+								"grid"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Get grid-based visualization data for 2D top-down view. Returns room dimensions and array of placement coordinates. Admin only."
+					},
+					"response": []
+				},
+				{
+					"name": "Get 3D Visualization",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": "Accept JSON response format"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text",
+								"description": "Bearer token for authentication (required, must be admin)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rooms/{{room_id}}/visualization/3d",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"rooms",
+								"{{room_id}}",
+								"visualization",
+								"3d"
+							],
+							"variable": [
+								{
+									"key": "room_id",
+									"value": "1",
+									"description": "Room ID (required, integer, must exist in database)"
+								}
+							]
+						},
+						"description": "Get 3D visualization data for Three.js or React Three Fiber rendering. Returns room dimensions and array of 3D objects with positions, dimensions, rotations, and stack information. Admin only."
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "Health Check",
 			"description": "System health and status endpoints.",
 			"item": [
@@ -1389,6 +2579,24 @@
 			"value": "1",
 			"type": "string",
 			"description": "Category ID for testing (integer as string)"
+		},
+		{
+			"key": "room_id",
+			"value": "1",
+			"type": "string",
+			"description": "Room ID for testing (integer as string)"
+		},
+		{
+			"key": "layout_id",
+			"value": "",
+			"type": "string",
+			"description": "Layout ID (set automatically after generating layout)"
+		},
+		{
+			"key": "placement_id",
+			"value": "1",
+			"type": "string",
+			"description": "Placement ID for testing (integer as string)"
 		}
 	]
 }

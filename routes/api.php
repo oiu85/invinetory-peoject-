@@ -12,6 +12,10 @@ use App\Http\Controllers\SaleController;
 use App\Http\Controllers\AdminStatsController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\AdminSalesController;
+use App\Http\Controllers\RoomController;
+use App\Http\Controllers\RoomLayoutController;
+use App\Http\Controllers\ProductDimensionController;
+use App\Http\Controllers\RoomVisualizationController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -59,6 +63,11 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/warehouse-stock', [WarehouseStockController::class, 'index']);
     Route::post('/warehouse-stock/update', [WarehouseStockController::class, 'update']);
+    
+    // Storage Suggestions
+    Route::get('/warehouse-stock/{product_id}/suggest-storage', [WarehouseStockController::class, 'suggestStorage']);
+    Route::post('/warehouse-stock/apply-suggestion', [WarehouseStockController::class, 'applySuggestion']);
+    Route::get('/warehouse-stock/pending-suggestions', [WarehouseStockController::class, 'pendingSuggestions']);
 });
 
 // ============================================
@@ -108,4 +117,37 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::put('/admin/drivers/{id}', [DriverController::class, 'update']);
     Route::delete('/admin/drivers/{id}', [DriverController::class, 'destroy']);
     Route::get('/admin/sales', [AdminSalesController::class, 'index']);
+
+    // ============================================
+    // ROOM SIMULATION ROUTES (Admin only)
+    // ============================================
+    
+    // Rooms CRUD
+    Route::apiResource('rooms', RoomController::class);
+    Route::get('rooms/{id}/stats', [RoomController::class, 'stats']);
+    
+    // Layout Generation
+    Route::post('rooms/{id}/generate-layout', [RoomLayoutController::class, 'generate']);
+    Route::get('rooms/{id}/layout', [RoomLayoutController::class, 'show']);
+    Route::put('rooms/{id}/layout', [RoomLayoutController::class, 'update']);
+    Route::post('rooms/{id}/layout/optimize', [RoomLayoutController::class, 'optimize']);
+    Route::delete('rooms/{id}/layout', [RoomLayoutController::class, 'destroy']);
+    
+    // Product Dimensions
+    Route::get('products/{id}/dimensions', [ProductDimensionController::class, 'show']);
+    Route::post('products/{id}/dimensions', [ProductDimensionController::class, 'store']);
+    Route::put('products/{id}/dimensions', [ProductDimensionController::class, 'update']);
+    Route::delete('products/{id}/dimensions', [ProductDimensionController::class, 'destroy']);
+    Route::get('products/dimensions', [ProductDimensionController::class, 'index']);
+    
+    // Visualization
+    Route::get('rooms/{id}/visualization', [RoomVisualizationController::class, 'index']);
+    Route::get('rooms/{id}/visualization/grid', [RoomVisualizationController::class, 'grid']);
+    Route::get('rooms/{id}/visualization/3d', [RoomVisualizationController::class, 'threeD']);
+    
+    // Placements
+    Route::get('rooms/{id}/placements', [RoomLayoutController::class, 'placements']);
+    Route::post('rooms/{id}/placements', [RoomLayoutController::class, 'addPlacement']);
+    Route::put('placements/{id}', [RoomLayoutController::class, 'updatePlacement']);
+    Route::delete('placements/{id}', [RoomLayoutController::class, 'deletePlacement']);
 });

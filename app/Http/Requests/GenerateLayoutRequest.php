@@ -16,9 +16,10 @@ class GenerateLayoutRequest extends FormRequest
         return [
             'algorithm' => 'nullable|string|in:laff_maxrects,maxrects,skyline',
             'allow_rotation' => 'nullable|boolean',
-            'items' => 'required|array|min:1',
+            // Guardrails: keep requests safe and predictable for API + algorithm runtime.
+            'items' => 'required|array|min:1|max:500',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|integer|min:1|max:500',
             'items.*.dimensions.width' => 'required_without:items.*.product_id|numeric|min:0.01',
             'items.*.dimensions.depth' => 'required_without:items.*.product_id|numeric|min:0.01',
             'items.*.dimensions.height' => 'required_without:items.*.product_id|numeric|min:0.01',

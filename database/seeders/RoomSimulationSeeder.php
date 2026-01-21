@@ -41,19 +41,40 @@ class RoomSimulationSeeder extends Seeder
             'max_weight' => 8000.0,
         ]);
 
-        // Add dimensions to existing products
+        // Add dimensions to existing products with realistic plastic carton sizes
         $products = Product::all();
+
+        // Small plastic carton/bag size categories (reduced sizes)
+        $sizeCategories = [
+            ['width' => 12.0, 'depth' => 10.0, 'height' => 8.0, 'weight' => 0.2], // Small
+            ['width' => 18.0, 'depth' => 15.0, 'height' => 12.0, 'weight' => 0.4], // Medium
+            ['width' => 25.0, 'depth' => 20.0, 'height' => 15.0, 'weight' => 0.6], // Large
+            ['width' => 30.0, 'depth' => 25.0, 'height' => 20.0, 'weight' => 0.8], // Extra Large
+        ];
 
         foreach ($products as $index => $product) {
             if (! $product->productDimension) {
+                // Cycle through size categories for variety
+                $sizeCategory = $sizeCategories[$index % count($sizeCategories)];
+                
+                // Add small random variations (±2cm) for realism
+                $width = $sizeCategory['width'] + (($index % 5) - 2) * 1.0;
+                $depth = $sizeCategory['depth'] + (($index % 7) - 3) * 1.0;
+                $height = $sizeCategory['height'] + (($index % 3) - 1) * 1.0;
+                
+                // Ensure dimensions stay within small range (8-35cm)
+                $width = max(8.0, min(35.0, $width));
+                $depth = max(8.0, min(35.0, $depth));
+                $height = max(5.0, min(25.0, $height));
+                
                 ProductDimension::create([
                     'product_id' => $product->id,
-                    'width' => 50.0 + ($index * 10),   // Varying sizes
-                    'depth' => 50.0 + ($index * 10),
-                    'height' => 30.0 + ($index * 5),
-                    'weight' => 5.0 + ($index * 2),
+                    'width' => round($width, 1),
+                    'depth' => round($depth, 1),
+                    'height' => round($height, 1),
+                    'weight' => $sizeCategory['weight'] + (($index % 3) * 0.3),
                     'rotatable' => true,
-                    'fragile' => $index % 3 === 0, // Every 3rd product is fragile
+                    'fragile' => $index % 4 === 0, // Every 4th product is fragile
                 ]);
             }
         }

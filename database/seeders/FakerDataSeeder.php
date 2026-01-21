@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductDimension;
 use App\Models\WarehouseStock;
 use App\Models\DriverStock;
 use App\Models\Sale;
@@ -139,6 +140,42 @@ class FakerDataSeeder extends Seeder
             
             $products[] = $product;
             $imageIndex++;
+            
+            // Create small product dimensions for plastic bags/cartons
+            // Reduced size categories for better space utilization
+            $sizeCategories = [
+                // Small bags (shopping bags, small packaging)
+                ['width' => 10.0, 'depth' => 8.0, 'height' => 5.0, 'weight' => 0.1],
+                // Medium bags (medium shopping, garbage bags)
+                ['width' => 15.0, 'depth' => 12.0, 'height' => 8.0, 'weight' => 0.2],
+                // Large bags (large shopping, large garbage)
+                ['width' => 20.0, 'depth' => 18.0, 'height' => 12.0, 'weight' => 0.4],
+                // Extra large (industrial bags)
+                ['width' => 28.0, 'depth' => 25.0, 'height' => 18.0, 'weight' => 0.6],
+            ];
+            
+            // Select size category based on product index
+            $sizeCategory = $sizeCategories[$imageIndex % count($sizeCategories)];
+            
+            // Add small variations for realism (±1.5cm)
+            $width = $sizeCategory['width'] + $faker->randomFloat(1, -1.5, 1.5);
+            $depth = $sizeCategory['depth'] + $faker->randomFloat(1, -1.5, 1.5);
+            $height = $sizeCategory['height'] + $faker->randomFloat(1, -1.0, 1.0);
+            
+            // Ensure dimensions stay within small range (6-30cm)
+            $width = max(6.0, min(30.0, $width));
+            $depth = max(6.0, min(30.0, $depth));
+            $height = max(4.0, min(22.0, $height));
+            
+            ProductDimension::create([
+                'product_id' => $product->id,
+                'width' => round($width, 1),
+                'depth' => round($depth, 1),
+                'height' => round($height, 1),
+                'weight' => $sizeCategory['weight'] + $faker->randomFloat(2, 0, 0.5),
+                'rotatable' => true,
+                'fragile' => $faker->boolean(20), // 20% chance of being fragile
+            ]);
             
             // Create warehouse stock (random quantity between 100-1000 for bags)
             WarehouseStock::create([

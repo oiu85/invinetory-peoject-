@@ -24,14 +24,38 @@ class RoomLayoutController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $room = Room::findOrFail($id);
-        $layout = $room->layouts()->latest()->first();
+        try {
+            $room = Room::findOrFail($id);
+            $layout = $room->layouts()->latest()->first();
 
-        if (! $layout) {
-            return response()->json(['message' => 'No layout found for this room'], 404);
+            if (! $layout) {
+                return response()->json([
+                    'message' => 'No layout found for this room',
+                    'room_id' => $id,
+                ], 404);
+            }
+
+            // Return the layout with its data and placements
+            $layout->load(['placements.product']);
+            
+            return response()->json([
+                'id' => $layout->id,
+                'room_id' => $layout->room_id,
+                'algorithm_used' => $layout->algorithm_used,
+                'utilization_percentage' => (float) $layout->utilization_percentage,
+                'total_items_placed' => $layout->total_items_placed,
+                'total_items_attempted' => $layout->total_items_attempted,
+                'layout_data' => $layout->layout_data,
+                'placements' => $layout->placements,
+                'created_at' => $layout->created_at,
+                'updated_at' => $layout->updated_at,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to fetch layout',
+                'message' => $e->getMessage(),
+            ], 500);
         }
-
-        return response()->json($layout->load(['placements.product']));
     }
 
     public function generate(GenerateLayoutRequest $request, int $id): JsonResponse
@@ -40,9 +64,25 @@ class RoomLayoutController extends Controller
 
         $validated = $request->validated();
         $algorithm = $validated['algorithm'] ?? 'laff_maxrects';
-        $allowRotation = $validated['allow_rotation'] ?? true;
+        // Rotation is always disabled in simplified 2D mode
+        $allowRotation = false;
         $items = $validated['items'];
         $options = $validated['options'] ?? [];
+
+        // Guardrail: cap expanded total items to keep runtime and DB writes bounded.
+        $expandedTotal = 0;
+        foreach ($items as $item) {
+            $expandedTotal += (int) ($item['quantity'] ?? 0);
+        }
+
+        if ($expandedTotal > 500) {
+            return response()->json([
+                'error' => 'Too many items requested',
+                'message' => 'Total requested quantity exceeds the maximum allowed (500). Reduce quantities or apply caps.',
+                'max_total_items' => 500,
+                'requested_total' => $expandedTotal,
+            ], 422);
+        }
 
         // Prepare items with dimensions
         $preparedItems = [];
@@ -64,21 +104,32 @@ class RoomLayoutController extends Controller
                 'width' => $item['dimensions']['width'] ?? $dimension->width,
                 'depth' => $item['dimensions']['depth'] ?? $dimension->depth,
                 'height' => $item['dimensions']['height'] ?? $dimension->height,
-                'rotatable' => $dimension->rotatable,
             ];
         }
 
-        // Generate layout
-        $result = $this->packingService->pack(
-            $preparedItems,
-            $room->width,
-            $room->depth,
-            $room->height,
-            [
-                'allow_rotation' => $allowRotation,
-                'prefer_bottom' => $options['prefer_bottom'] ?? true,
-            ]
-        );
+        // Generate layout (simplified 2D mode: no rotation, floor-only)
+        try {
+            $result = $this->packingService->pack(
+                $preparedItems,
+                $room->width,
+                $room->depth,
+                $room->height,
+                [
+                    'prefer_bottom' => $options['prefer_bottom'] ?? true,
+                ]
+            );
+        } catch (\Exception $e) {
+            \Log::error('Packing service error', [
+                'room_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'error' => 'Failed to generate layout',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
 
         // Validate layout
         $validation = $this->layoutValidator->validateLayout(
@@ -89,9 +140,18 @@ class RoomLayoutController extends Controller
         );
 
         if (! $validation['valid']) {
+            \Log::error('Layout validation failed', [
+                'room_id' => $id,
+                'errors' => $validation['errors'],
+                'placements_count' => count($result['placements']),
+                'sample_placement' => $result['placements'][0] ?? null,
+            ]);
+            
             return response()->json([
                 'error' => 'Layout validation failed',
+                'message' => 'The generated layout has validation errors. Please check the errors array for details.',
                 'errors' => $validation['errors'],
+                'warnings' => $validation['warnings'] ?? [],
             ], 400);
         }
 
@@ -103,7 +163,7 @@ class RoomLayoutController extends Controller
                 'algorithm_used' => $algorithm,
                 'utilization_percentage' => $result['utilization'],
                 'total_items_placed' => count($result['placements']),
-                'total_items_attempted' => count($preparedItems),
+                'total_items_attempted' => $expandedTotal,
                 'layout_data' => [
                     'version' => '1.0',
                     'algorithm' => $algorithm,
@@ -125,8 +185,13 @@ class RoomLayoutController extends Controller
                     'width' => $placement['width'],
                     'depth' => $placement['depth'],
                     'height' => $placement['height'],
-                    'rotation' => $placement['rotation'],
-                    'layer_index' => $placement['layer_index'],
+                    'rotation' => '0', // Always no rotation in simplified 2D mode
+                    'layer_index' => $placement['layer_index'] ?? 0,
+                    'stack_id' => $placement['stack_id'] ?? null,
+                    'stack_position' => $placement['stack_position'] ?? 1,
+                    'stack_base_x' => $placement['stack_base_x'] ?? $placement['x'],
+                    'stack_base_y' => $placement['stack_base_y'] ?? $placement['y'],
+                    'items_below_count' => $placement['items_below_count'] ?? 0,
                 ]);
             }
 
@@ -182,17 +247,16 @@ class RoomLayoutController extends Controller
                 'width' => $placement->width,
                 'depth' => $placement->depth,
                 'height' => $placement->height,
-                'rotatable' => true,
             ];
         }
 
-        // Regenerate layout
+        // Regenerate layout (simplified 2D mode: no rotation, floor-only)
         $result = $this->packingService->pack(
             $items,
             $room->width,
             $room->depth,
             $room->height,
-            ['allow_rotation' => true, 'prefer_bottom' => true]
+            ['prefer_bottom' => true]
         );
 
         // Update layout
@@ -222,8 +286,13 @@ class RoomLayoutController extends Controller
                     'width' => $placement['width'],
                     'depth' => $placement['depth'],
                     'height' => $placement['height'],
-                    'rotation' => $placement['rotation'],
-                    'layer_index' => $placement['layer_index'],
+                    'rotation' => '0', // Always no rotation in simplified 2D mode
+                    'layer_index' => $placement['layer_index'] ?? 0,
+                    'stack_id' => $placement['stack_id'] ?? null,
+                    'stack_position' => $placement['stack_position'] ?? 1,
+                    'stack_base_x' => $placement['stack_base_x'] ?? $placement['x'],
+                    'stack_base_y' => $placement['stack_base_y'] ?? $placement['y'],
+                    'items_below_count' => $placement['items_below_count'] ?? 0,
                 ]);
             }
 
@@ -255,16 +324,23 @@ class RoomLayoutController extends Controller
 
     public function placements(int $id): JsonResponse
     {
-        $room = Room::findOrFail($id);
-        $layout = $room->layouts()->latest()->first();
+        try {
+            $room = Room::findOrFail($id);
+            $layout = $room->layouts()->latest()->first();
 
-        if (! $layout) {
-            return response()->json(['placements' => []]);
+            if (! $layout) {
+                return response()->json([]);
+            }
+
+            $placements = $layout->placements()->with('product')->get();
+
+            return response()->json($placements->toArray());
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to fetch placements',
+                'message' => $e->getMessage(),
+            ], 500);
         }
-
-        $placements = $layout->placements()->with('product')->get();
-
-        return response()->json($placements);
     }
 
     public function addPlacement(Request $request, int $id): JsonResponse
@@ -290,7 +366,7 @@ class RoomLayoutController extends Controller
         $placement = ItemPlacement::create([
             'room_layout_id' => $layout->id,
             ...$validated,
-            'rotation' => $validated['rotation'] ?? '0',
+            'rotation' => '0', // Always no rotation in simplified 2D mode
             'layer_index' => 0,
         ]);
 
@@ -310,6 +386,9 @@ class RoomLayoutController extends Controller
             'height' => 'sometimes|numeric|min:0.01',
             'rotation' => 'sometimes|in:0,90,180,270',
         ]);
+
+        // Force rotation to '0' in simplified 2D mode
+        $validated['rotation'] = '0';
 
         $placement->update($validated);
 

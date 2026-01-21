@@ -27,11 +27,12 @@ class FreeSpaceManager
     }
 
     /**
-     * Find the best fit rectangle for an item.
+     * Find the best fit rectangle for an item (2D floor placement only).
+     * Height is ignored for placement logic - only width and depth matter.
      *
      * @param float $itemWidth Item width
      * @param float $itemDepth Item depth
-     * @param float $itemHeight Item height
+     * @param float $itemHeight Item height (stored but not used for placement)
      * @return Rectangle|null Best fit rectangle or null if no fit
      */
     public function findBestFit(
@@ -43,7 +44,8 @@ class FreeSpaceManager
         $bestWaste = PHP_FLOAT_MAX;
 
         foreach ($this->freeRectangles as $rect) {
-            if ($rect->canFit(new Rectangle(0, 0, $itemWidth, $itemDepth, $itemHeight))) {
+            // Only check width and depth (2D floor space), ignore height
+            if ($itemWidth <= $rect->width && $itemDepth <= $rect->depth) {
                 $waste = $rect->getArea() - ($itemWidth * $itemDepth);
 
                 // Prefer bottom-left placement (lower Y, then lower X)

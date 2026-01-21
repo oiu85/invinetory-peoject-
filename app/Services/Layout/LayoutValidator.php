@@ -41,14 +41,44 @@ class LayoutValidator
                 $placement['height']
             );
 
-            // Check boundaries
-            if (! $this->collisionDetector->fitsInRoom($box, $roomWidth, $roomDepth, $roomHeight)) {
-                $errors[] = "Placement #{$index} exceeds room boundaries";
+            // Check boundaries (2D for floor, height check separately)
+            if (! $this->collisionDetector->fitsInRoom2D($box, $roomWidth, $roomDepth)) {
+                $errors[] = "Placement #{$index} exceeds room floor boundaries";
+            }
+            
+            // Check height separately
+            if ($box->getTopZ() > $roomHeight) {
+                $errors[] = "Placement #{$index} exceeds room height (top Z: {$box->getTopZ()}, room height: {$roomHeight})";
             }
 
-            // Check collisions
-            if ($this->collisionDetector->hasCollision($box, $boxes)) {
-                $errors[] = "Placement #{$index} collides with another item";
+            // Check collisions (2D only - but only for floor-level items)
+            // Stacked items (z > 0) can share the same X,Y position
+            $isFloorLevel = $placement['z'] < 0.1;
+            
+            if ($isFloorLevel) {
+                // Only check collision with other floor-level items
+                $floorBoxes = array_filter($boxes, function($b) {
+                    return $b->z < 0.1;
+                });
+                
+                if ($this->collisionDetector->hasCollision2D($box, $floorBoxes)) {
+                    $errors[] = "Placement #{$index} collides with another item on floor";
+                }
+            } else {
+                // For stacked items, verify they're actually stacked (same X,Y as a floor item)
+                $hasBaseItem = false;
+                foreach ($boxes as $existingBox) {
+                    if ($existingBox->z < 0.1 
+                        && abs($existingBox->x - $box->x) < 0.1 
+                        && abs($existingBox->y - $box->y) < 0.1) {
+                        $hasBaseItem = true;
+                        break;
+                    }
+                }
+                
+                if (!$hasBaseItem) {
+                    $errors[] = "Placement #{$index} is stacked (Z={$placement['z']}) but has no base item at X={$placement['x']}, Y={$placement['y']}";
+                }
             }
 
             $boxes[] = $box;

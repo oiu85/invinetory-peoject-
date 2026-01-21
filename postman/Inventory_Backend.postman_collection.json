@@ -1996,7 +1996,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"algorithm\": \"laff_maxrects\",\n    \"allow_rotation\": true,\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 5,\n            \"dimensions\": {\n                \"width\": 50,\n                \"depth\": 50,\n                \"height\": 30\n            }\n        },\n        {\n            \"product_id\": 2,\n            \"quantity\": 10,\n            \"dimensions\": {\n                \"width\": 40,\n                \"depth\": 40,\n                \"height\": 25\n            }\n        }\n    ],\n    \"options\": {\n        \"max_layers\": null,\n        \"prefer_bottom\": true,\n        \"minimize_height\": false\n    }\n}",
+							"raw": "{\n    \"algorithm\": \"laff_maxrects\",\n    \"allow_rotation\": true,\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 5\n        },\n        {\n            \"product_id\": 2,\n            \"quantity\": 10\n        },\n        {\n            \"product_id\": 3,\n            \"quantity\": 25\n        }\n    ],\n    \"options\": {\n        \"max_layers\": null,\n        \"prefer_bottom\": true,\n        \"minimize_height\": false\n    }\n}\n\n// Note: UI supports “Init from warehouse stock” by calling:\n// - GET /warehouse-stock\n// - GET /products/dimensions\n// then building the items list with caps (per-product cap 25, max total 500)\n// and finally POSTing to this endpoint.\n",
 							"options": {
 								"raw": {
 									"language": "json"

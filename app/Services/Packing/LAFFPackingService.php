@@ -7,12 +7,10 @@ use App\Algorithms\Spatial\Rectangle;
 use App\Services\Packing\PackingServiceInterface;
 use App\Services\Spatial\CollisionDetector;
 use App\Services\Spatial\FreeSpaceManager;
-use App\Services\Spatial\RotationHandler;
 
 class LAFFPackingService implements PackingServiceInterface
 {
     public function __construct(
-        private RotationHandler $rotationHandler,
         private CollisionDetector $collisionDetector
     ) {
     }
@@ -34,13 +32,10 @@ class LAFFPackingService implements PackingServiceInterface
         float $roomHeight,
         array $options = []
     ): array {
-        $allowRotation = $options['allow_rotation'] ?? true;
-        $preferBottom = $options['prefer_bottom'] ?? true;
-
         // Expand items by quantity
         $expandedItems = $this->expandItems($items);
 
-        // Sort by base area (largest first)
+        // Sort by base area (largest first) - LAFF algorithm
         usort($expandedItems, function ($a, $b) {
             $areaA = $a['width'] * $a['depth'];
             $areaB = $b['width'] * $b['depth'];
@@ -57,6 +52,9 @@ class LAFFPackingService implements PackingServiceInterface
         $placements = [];
         $unplacedItems = [];
         $placedBoxes = [];
+        
+        // Track stacks by (product_id, stack_base_x, stack_base_y) for faster lookup
+        $stackMap = [];
 
         foreach ($expandedItems as $item) {
             $placed = $this->placeItem(
@@ -65,22 +63,59 @@ class LAFFPackingService implements PackingServiceInterface
                 $roomWidth,
                 $roomDepth,
                 $roomHeight,
-                $allowRotation,
-                $placedBoxes
+                $placedBoxes,
+                $placements, // Pass existing placements for stack checking
+                $stackMap // Pass stack map for faster lookup
             );
 
             if ($placed) {
                 $placements[] = $placed;
-                $placedBoxes[] = new Box(
-                    $placed['x'],
-                    $placed['y'],
-                    $placed['z'],
-                    $placed['width'],
-                    $placed['depth'],
-                    $placed['height']
-                );
+                
+                // Only add to placedBoxes if it's floor-level (for collision detection)
+                // Stacked items don't need to be in placedBoxes for floor collision
+                if ($placed['z'] < 0.1) {
+                    $placedBoxes[] = new Box(
+                        $placed['x'],
+                        $placed['y'],
+                        $placed['z'],
+                        $placed['width'],
+                        $placed['depth'],
+                        $placed['height']
+                    );
+                }
             } else {
-                $unplacedItems[] = $item;
+                // Determine why item couldn't be placed
+                $reason = 'No floor space available for this item';
+                
+                // Check if it's a height issue
+                if ($item['height'] > $roomHeight) {
+                    $reason = "Item height ({$item['height']} cm) exceeds room height ({$roomHeight} cm)";
+                } else {
+                    // Check if there's any free space that could fit this item
+                    $freeRects = $freeSpaceManager->getFreeRectangles();
+                    $hasSpace = false;
+                    foreach ($freeRects as $rect) {
+                        if ($item['width'] <= $rect->width && $item['depth'] <= $rect->depth) {
+                            $hasSpace = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!$hasSpace) {
+                        $reason = 'No free floor space large enough for this item';
+                    } else {
+                        // There's space but collision detected - this shouldn't happen normally
+                        $reason = 'Free space found but collision detected (possible algorithm bug)';
+                    }
+                }
+                
+                $unplacedItems[] = [
+                    'product_id' => $item['product_id'],
+                    'width' => $item['width'],
+                    'depth' => $item['depth'],
+                    'height' => $item['height'],
+                    'reason' => $reason,
+                ];
             }
         }
 
@@ -92,6 +127,7 @@ class LAFFPackingService implements PackingServiceInterface
             'utilization' => $utilization,
         ];
     }
+
 
     /**
      * Expand items by quantity.
@@ -111,7 +147,6 @@ class LAFFPackingService implements PackingServiceInterface
                     'width' => $item['width'],
                     'depth' => $item['depth'],
                     'height' => $item['height'],
-                    'rotatable' => $item['rotatable'] ?? true,
                 ];
             }
         }
@@ -120,7 +155,80 @@ class LAFFPackingService implements PackingServiceInterface
     }
 
     /**
-     * Place a single item.
+     * Find existing stack for same product at given position using stack map.
+     *
+     * @param array $stackMap Stack map: key = "productId_x_y", value = stack info
+     * @param int $productId Product ID to match
+     * @param float $x X position
+     * @param float $y Y position
+     * @param float $tolerance Position tolerance in cm (default 1.0 for better matching)
+     * @return array{stack_height: float, items_count: int, stack_id: int, stack_base_x: float, stack_base_y: float}|null
+     */
+    private function findExistingStackInMap(
+        array &$stackMap,
+        int $productId,
+        float $x,
+        float $y,
+        float $tolerance = 1.0
+    ): ?array {
+        // Round positions to reduce floating point precision issues
+        $roundedX = round($x, 1);
+        $roundedY = round($y, 1);
+
+        // Check all stacks for this product
+        foreach ($stackMap as $key => $stackInfo) {
+            if (!str_starts_with($key, "{$productId}_")) {
+                continue;
+            }
+
+            $stackX = $stackInfo['stack_base_x'];
+            $stackY = $stackInfo['stack_base_y'];
+
+            // Check if position matches (within tolerance)
+            if (abs($stackX - $roundedX) <= $tolerance && abs($stackY - $roundedY) <= $tolerance) {
+                return $stackInfo;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Update stack map after placing an item.
+     */
+    private function updateStackMap(
+        array &$stackMap,
+        array $placement
+    ): void {
+        $productId = $placement['product_id'];
+        $baseX = $placement['stack_base_x'];
+        $baseY = $placement['stack_base_y'];
+        $key = "{$productId}_{$baseX}_{$baseY}";
+
+        if (!isset($stackMap[$key])) {
+            $stackMap[$key] = [
+                'stack_height' => 0.0,
+                'items_count' => 0,
+                'stack_id' => $placement['stack_id'],
+                'stack_base_x' => $baseX,
+                'stack_base_y' => $baseY,
+            ];
+        }
+
+        $stackMap[$key]['stack_height'] += $placement['height'];
+        $stackMap[$key]['items_count']++;
+    }
+
+    /**
+     * Generate stack ID from product and position.
+     */
+    private function generateStackId(int $productId, float $x, float $y): int
+    {
+        return crc32("{$productId}_{$x}_{$y}");
+    }
+
+    /**
+     * Place a single item with vertical stacking support.
      *
      * @return array|null Placement data or null if cannot place
      */
@@ -130,82 +238,143 @@ class LAFFPackingService implements PackingServiceInterface
         float $roomWidth,
         float $roomDepth,
         float $roomHeight,
-        bool $allowRotation,
-        array $placedBoxes
+        array $placedBoxes,
+        array $placements = [],
+        array &$stackMap = []
     ): ?array {
-        $rotations = $this->rotationHandler->getAllRotations(
-            $item['width'],
-            $item['depth'],
-            $item['height'],
-            $allowRotation && ($item['rotatable'] ?? true)
-        );
+        // Check if item height fits in room
+        if ($item['height'] > $roomHeight) {
+            return null;
+        }
 
-        $bestPlacement = null;
-        $bestWaste = PHP_FLOAT_MAX;
-
-        foreach ($rotations as $rotation => $dimensions) {
-            $fitRect = $freeSpaceManager->findBestFit(
-                $dimensions['width'],
-                $dimensions['depth'],
-                $dimensions['height']
-            );
-
-            if ($fitRect === null) {
+        // PRIORITY 1: Try to stack on existing stack of same product
+        // Check all existing stacks for this product to see if we can stack
+        $bestStack = null;
+        $bestStackKey = null;
+        
+        foreach ($stackMap as $key => $stackInfo) {
+            if (!str_starts_with($key, "{$item['product_id']}_")) {
                 continue;
             }
 
-            // Try to place at Z=0 first (ground level)
-            $zPosition = 0;
+            $stackHeight = $stackInfo['stack_height'];
+            $newStackHeight = $stackHeight + $item['height'];
 
-            $box = new Box(
-                $fitRect->x,
-                $fitRect->y,
-                $zPosition,
-                $dimensions['width'],
-                $dimensions['depth'],
-                $dimensions['height']
-            );
-
-            // Check collision
-            if ($this->collisionDetector->hasCollision($box, $placedBoxes)) {
-                continue;
-            }
-
-            // Check boundaries
-            if (! $this->collisionDetector->fitsInRoom($box, $roomWidth, $roomDepth, $roomHeight)) {
-                continue;
-            }
-
-            $waste = $fitRect->getArea() - ($dimensions['width'] * $dimensions['depth']);
-
-            if ($waste < $bestWaste) {
-                $bestWaste = $waste;
-                $bestPlacement = [
-                    'product_id' => $item['product_id'],
-                    'x' => $fitRect->x,
-                    'y' => $fitRect->y,
-                    'z' => $zPosition,
-                    'width' => $dimensions['width'],
-                    'depth' => $dimensions['depth'],
-                    'height' => $dimensions['height'],
-                    'rotation' => $rotation,
-                    'layer_index' => 0,
-                ];
+            // Check if we can stack here (height fits in room)
+            if ($newStackHeight <= $roomHeight) {
+                // This is a valid stack position
+                // Prefer lower stacks (more stable)
+                if ($bestStack === null || $stackHeight < $bestStack['stack_height']) {
+                    $bestStack = $stackInfo;
+                    $bestStackKey = $key;
+                }
             }
         }
 
-        if ($bestPlacement) {
+        // If we found a stack, use it
+        if ($bestStack !== null) {
+            $x = $bestStack['stack_base_x'];
+            $y = $bestStack['stack_base_y'];
+            $zPosition = $bestStack['stack_height'];
+            $stackId = $bestStack['stack_id'];
+            $stackPosition = $bestStack['items_count'] + 1;
+            $stackBaseX = $bestStack['stack_base_x'];
+            $stackBaseY = $bestStack['stack_base_y'];
+            $itemsBelowCount = $bestStack['items_count'];
+            $isStacked = true;
+        } else {
+            // PRIORITY 2: Find new floor position
+            $fitRect = $freeSpaceManager->findBestFit(
+                $item['width'],
+                $item['depth'],
+                $item['height']
+            );
+
+            if ($fitRect === null) {
+                return null;
+            }
+
+            $x = $fitRect->x;
+            $y = $fitRect->y;
+            $zPosition = 0.0;
+            $stackId = $this->generateStackId($item['product_id'], $x, $y);
+            $stackPosition = 1;
+            $stackBaseX = $x;
+            $stackBaseY = $y;
+            $itemsBelowCount = 0;
+            $isStacked = false;
+        }
+
+        // Round positions to reduce floating point issues
+        $x = round($x, 1);
+        $y = round($y, 1);
+        $stackBaseX = round($stackBaseX, 1);
+        $stackBaseY = round($stackBaseY, 1);
+
+        $box = new Box(
+            $x,
+            $y,
+            $zPosition,
+            $item['width'],
+            $item['depth'],
+            $item['height']
+        );
+
+        // Verify boundaries
+        if ($box->x < 0 || $box->y < 0 
+            || $box->getRightX() > $roomWidth 
+            || $box->getTopY() > $roomDepth) {
+            return null;
+        }
+
+        // Check 2D collision only for floor-level items (stacked items don't need floor collision check)
+        if (!$isStacked) {
+            foreach ($placedBoxes as $existingBox) {
+                // Check if rectangles overlap on X-Y plane (ignore Z)
+                $overlapsX = !($box->x >= $existingBox->getRightX() || $box->getRightX() <= $existingBox->x);
+                $overlapsY = !($box->y >= $existingBox->getTopY() || $box->getTopY() <= $existingBox->y);
+                
+                if ($overlapsX && $overlapsY) {
+                    // Collision detected - skip this position
+                    return null;
+                }
+            }
+        }
+
+        // Create placement
+        $placement = [
+            'product_id' => $item['product_id'],
+            'x' => $x,
+            'y' => $y,
+            'z' => $zPosition,
+            'width' => $item['width'],
+            'depth' => $item['depth'],
+            'height' => $item['height'],
+            'rotation' => '0', // Always no rotation
+            'layer_index' => (int) floor($zPosition / 10), // Layer based on Z position
+            'stack_id' => $stackId,
+            'stack_position' => $stackPosition,
+            'stack_base_x' => $stackBaseX,
+            'stack_base_y' => $stackBaseY,
+            'items_below_count' => $itemsBelowCount,
+        ];
+
+        // Update free space only if placing on floor (not stacking)
+        if (!$isStacked) {
             $usedRect = new Rectangle(
-                $bestPlacement['x'],
-                $bestPlacement['y'],
-                $bestPlacement['width'],
-                $bestPlacement['depth'],
-                $bestPlacement['height']
+                $placement['x'],
+                $placement['y'],
+                $placement['width'],
+                $placement['depth'],
+                $placement['height']
             );
             $freeSpaceManager->splitFreeSpace($usedRect);
         }
 
-        return $bestPlacement;
+        // Update stack map
+        $this->updateStackMap($stackMap, $placement);
+
+        return $placement;
     }
 
     /**

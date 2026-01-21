@@ -44,6 +44,14 @@ class ItemPlacement extends Model
         ];
     }
 
+    /**
+     * Set the rotation attribute, ensuring it's always a string.
+     */
+    public function setRotationAttribute($value): void
+    {
+        $this->attributes['rotation'] = (string) $value;
+    }
+
     public function roomLayout(): BelongsTo
     {
         return $this->belongsTo(RoomLayout::class);

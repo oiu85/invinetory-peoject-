@@ -8,6 +8,7 @@ use App\Services\Storage\StorageFeedbackService;
 use App\Services\Storage\StorageSuggestionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class WarehouseStockController extends Controller
 {
@@ -19,9 +20,38 @@ class WarehouseStockController extends Controller
 
     public function index(): JsonResponse
     {
-        $stock = WarehouseStock::with('product.category')->get();
+        try {
+            $stock = WarehouseStock::with([
+                'product.category' // Use dot notation for nested eager loading
+            ])->get();
 
-        return response()->json($stock);
+            // Handle cases where product might be null or category might be null
+            $stock = $stock->map(function ($item) {
+                if (!$item->product) {
+                    // If product was deleted, skip it
+                    return null;
+                }
+                // Ensure category is set even if null
+                if (!$item->product->category && $item->product->category_id) {
+                    // Category was deleted but product still references it
+                    $item->product->category = null;
+                }
+                return $item;
+            })->filter(); // Remove null items
+
+            return response()->json($stock->values());
+        } catch (\Exception $e) {
+            Log::error('WarehouseStock index error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            
+            return response()->json([
+                'error' => 'Failed to fetch warehouse stock',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function update(Request $request): JsonResponse

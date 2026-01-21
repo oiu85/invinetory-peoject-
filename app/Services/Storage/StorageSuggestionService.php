@@ -8,6 +8,7 @@ use App\Models\ProductDimension;
 use App\Models\Room;
 use App\Services\Layout\LayoutValidator;
 use App\Services\Packing\LAFFPackingService;
+use App\Services\Storage\VerticalStackingService;
 
 class StorageSuggestionService
 {
@@ -121,6 +122,10 @@ class StorageSuggestionService
 
                 $canFit = min($capacity, $quantity);
 
+                // Calculate position label values
+                $startPosition = $stack['items_count'] + 1;
+                $endPosition = $stack['items_count'] + $canFit;
+
                 $options[] = [
                     'room_id' => $room->id,
                     'room_name' => $room->name,
@@ -136,7 +141,7 @@ class StorageSuggestionService
                     'utilization_after' => 0, // Will be calculated
                     'visualization' => [
                         'color' => '#4CAF50',
-                        'position_label' => "Stack Position {$stack['items_count'] + 1}-" . ($stack['items_count'] + $canFit),
+                        'position_label' => "Stack Position {$startPosition}-{$endPosition}",
                     ],
                 ];
             }

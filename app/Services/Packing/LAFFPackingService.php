@@ -104,8 +104,9 @@ class LAFFPackingService implements PackingServiceInterface
                     if (!$hasSpace) {
                         $reason = 'No free floor space large enough for this item';
                     } else {
-                        // There's space but collision detected - this shouldn't happen normally
-                        $reason = 'Free space found but collision detected (possible algorithm bug)';
+                        // There is at least one candidate free rectangle, but none of them were usable
+                        // once we applied boundary + collision checks.
+                        $reason = 'No valid non-colliding floor position found for this item';
                     }
                 }
                 
@@ -228,6 +229,40 @@ class LAFFPackingService implements PackingServiceInterface
     }
 
     /**
+     * Get candidate floor rectangles that can fit the item, ordered by best-fit
+     * (least waste) then bottom-left (lower Y, then lower X).
+     *
+     * @return array<Rectangle>
+     */
+    private function getCandidateFloorRects(
+        FreeSpaceManager $freeSpaceManager,
+        float $itemWidth,
+        float $itemDepth
+    ): array {
+        $rects = array_values(array_filter(
+            $freeSpaceManager->getFreeRectangles(),
+            static fn (Rectangle $r) => $itemWidth <= $r->width && $itemDepth <= $r->depth
+        ));
+
+        usort($rects, static function (Rectangle $a, Rectangle $b) use ($itemWidth, $itemDepth) {
+            $wasteA = $a->getArea() - ($itemWidth * $itemDepth);
+            $wasteB = $b->getArea() - ($itemWidth * $itemDepth);
+
+            if (abs($wasteA - $wasteB) > 0.01) {
+                return $wasteA <=> $wasteB;
+            }
+
+            if (abs($a->y - $b->y) > 0.01) {
+                return $a->y <=> $b->y;
+            }
+
+            return $a->x <=> $b->x;
+        });
+
+        return $rects;
+    }
+
+    /**
      * Place a single item with vertical stacking support.
      *
      * @return array|null Placement data or null if cannot place
@@ -250,7 +285,6 @@ class LAFFPackingService implements PackingServiceInterface
         // PRIORITY 1: Try to stack on existing stack of same product
         // Check all existing stacks for this product to see if we can stack
         $bestStack = null;
-        $bestStackKey = null;
         
         foreach ($stackMap as $key => $stackInfo) {
             if (!str_starts_with($key, "{$item['product_id']}_")) {
@@ -266,12 +300,13 @@ class LAFFPackingService implements PackingServiceInterface
                 // Prefer lower stacks (more stable)
                 if ($bestStack === null || $stackHeight < $bestStack['stack_height']) {
                     $bestStack = $stackInfo;
-                    $bestStackKey = $key;
                 }
             }
         }
 
-        // If we found a stack, use it
+        // If we found a stack, use it.
+        // Note: If a stack is at/near the roof, it won't be chosen above because of the height check.
+        // In that case we will place a NEW base on the floor (new position) for that product.
         if ($bestStack !== null) {
             $x = $bestStack['stack_base_x'];
             $y = $bestStack['stack_base_y'];
@@ -283,26 +318,60 @@ class LAFFPackingService implements PackingServiceInterface
             $itemsBelowCount = $bestStack['items_count'];
             $isStacked = true;
         } else {
-            // PRIORITY 2: Find new floor position
-            $fitRect = $freeSpaceManager->findBestFit(
+            // PRIORITY 2: Find a new floor position.
+            // IMPORTANT: try multiple candidate rectangles. findBestFit() returns only one rect and
+            // can still lead to a collision if free rectangles overlap due to splitting.
+            $candidates = $this->getCandidateFloorRects(
+                $freeSpaceManager,
                 $item['width'],
-                $item['depth'],
-                $item['height']
+                $item['depth']
             );
 
-            if ($fitRect === null) {
+            if (empty($candidates)) {
                 return null;
             }
 
-            $x = $fitRect->x;
-            $y = $fitRect->y;
-            $zPosition = 0.0;
-            $stackId = $this->generateStackId($item['product_id'], $x, $y);
-            $stackPosition = 1;
-            $stackBaseX = $x;
-            $stackBaseY = $y;
-            $itemsBelowCount = 0;
-            $isStacked = false;
+            $found = false;
+            foreach ($candidates as $candidate) {
+                $candidateX = round($candidate->x, 1);
+                $candidateY = round($candidate->y, 1);
+
+                $candidateBox = new Box(
+                    $candidateX,
+                    $candidateY,
+                    0.0,
+                    $item['width'],
+                    $item['depth'],
+                    $item['height']
+                );
+
+                // Verify boundaries
+                if (! $this->collisionDetector->fitsInRoom2D($candidateBox, $roomWidth, $roomDepth)) {
+                    continue;
+                }
+
+                // Check floor collision against already-placed floor boxes
+                if ($this->collisionDetector->hasCollision2D($candidateBox, $placedBoxes)) {
+                    continue;
+                }
+
+                // Found valid floor placement
+                $x = $candidateX;
+                $y = $candidateY;
+                $zPosition = 0.0;
+                $stackId = $this->generateStackId($item['product_id'], $x, $y);
+                $stackPosition = 1;
+                $stackBaseX = $x;
+                $stackBaseY = $y;
+                $itemsBelowCount = 0;
+                $isStacked = false;
+                $found = true;
+                break;
+            }
+
+            if (! $found) {
+                return null;
+            }
         }
 
         // Round positions to reduce floating point issues
@@ -329,15 +398,9 @@ class LAFFPackingService implements PackingServiceInterface
 
         // Check 2D collision only for floor-level items (stacked items don't need floor collision check)
         if (!$isStacked) {
-            foreach ($placedBoxes as $existingBox) {
-                // Check if rectangles overlap on X-Y plane (ignore Z)
-                $overlapsX = !($box->x >= $existingBox->getRightX() || $box->getRightX() <= $existingBox->x);
-                $overlapsY = !($box->y >= $existingBox->getTopY() || $box->getTopY() <= $existingBox->y);
-                
-                if ($overlapsX && $overlapsY) {
-                    // Collision detected - skip this position
-                    return null;
-                }
+            if ($this->collisionDetector->hasCollision2D($box, $placedBoxes)) {
+                // This should be rare now because we try multiple candidates above.
+                return null;
             }
         }
 

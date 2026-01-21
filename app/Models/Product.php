@@ -48,4 +48,9 @@ class Product extends Model
     {
         return $this->hasOne(ProductDimension::class);
     }
+
+    public function roomStocks(): HasMany
+    {
+        return $this->hasMany(RoomStock::class);
+    }
 }

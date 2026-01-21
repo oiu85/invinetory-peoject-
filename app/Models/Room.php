@@ -42,6 +42,11 @@ class Room extends Model
         return $this->hasMany(RoomLayout::class);
     }
 
+    public function roomStocks(): HasMany
+    {
+        return $this->hasMany(RoomStock::class);
+    }
+
     public function getVolumeAttribute(): float
     {
         return $this->width * $this->depth * $this->height;

@@ -58,16 +58,21 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 });
 
 // ============================================
-// WAREHOUSE STOCK ROUTES (Admin only)
+// WAREHOUSE STOCK & ROOM STOCK ROUTES (Admin only)
 // ============================================
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/warehouse-stock', [WarehouseStockController::class, 'index']);
     Route::post('/warehouse-stock/update', [WarehouseStockController::class, 'update']);
+    Route::post('/warehouse-stock/place', [WarehouseStockController::class, 'placeIntoRoom']);
     
     // Storage Suggestions
     Route::get('/warehouse-stock/{product_id}/suggest-storage', [WarehouseStockController::class, 'suggestStorage']);
     Route::post('/warehouse-stock/apply-suggestion', [WarehouseStockController::class, 'applySuggestion']);
     Route::get('/warehouse-stock/pending-suggestions', [WarehouseStockController::class, 'pendingSuggestions']);
+
+    // Room stock (per-room inventory)
+    Route::get('/rooms/{id}/stock', [RoomController::class, 'stock']);
+    Route::get('/products/{id}/room-availability', [RoomController::class, 'productRoomAvailability']);
 });
 
 // ============================================

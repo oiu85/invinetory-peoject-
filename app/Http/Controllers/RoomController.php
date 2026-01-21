@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreRoomRequest;
 use App\Http\Requests\UpdateRoomRequest;
 use App\Models\Room;
+use App\Models\RoomStock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -73,5 +74,59 @@ class RoomController extends Controller
         ];
 
         return response()->json($stats);
+    }
+
+    /**
+     * Get per-product stock quantities for a specific room.
+     */
+    public function stock(int $id): JsonResponse
+    {
+        $room = Room::findOrFail($id);
+
+        $stocks = RoomStock::with('product.category')
+            ->where('room_id', $room->id)
+            ->orderBy('product_id')
+            ->get()
+            ->map(function (RoomStock $stock) {
+                return [
+                    'room_id' => $stock->room_id,
+                    'product_id' => $stock->product_id,
+                    'product_name' => $stock->product?->name,
+                    'category' => $stock->product?->category,
+                    'quantity' => $stock->quantity,
+                ];
+            });
+
+        return response()->json([
+            'room_id' => $room->id,
+            'room_name' => $room->name,
+            'stocks' => $stocks,
+        ]);
+    }
+
+    /**
+     * Get availability of a product across all rooms.
+     */
+    public function productRoomAvailability(int $id): JsonResponse
+    {
+        $stocks = RoomStock::with('room.warehouse')
+            ->where('product_id', $id)
+            ->where('quantity', '>', 0)
+            ->orderBy('room_id')
+            ->get()
+            ->map(function (RoomStock $stock) {
+                return [
+                    'room_id' => $stock->room_id,
+                    'room_name' => $stock->room?->name,
+                    'warehouse_id' => $stock->room?->warehouse_id,
+                    'warehouse_name' => $stock->room?->warehouse?->name,
+                    'quantity' => $stock->quantity,
+                ];
+            });
+
+        return response()->json([
+            'product_id' => $id,
+            'rooms' => $stocks,
+        ]);
     }
 }

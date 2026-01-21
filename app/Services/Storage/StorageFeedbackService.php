@@ -14,7 +14,8 @@ class StorageFeedbackService
         $recommendations = [];
         $warnings = [];
 
-        if (empty($suggestions['placement_options'])) {
+        // Check if placement_options exists and is not empty
+        if (!isset($suggestions['placement_options']) || empty($suggestions['placement_options'])) {
             return [
                 'recommendations' => ['No storage space available for this product'],
                 'warnings' => ['Consider removing items or expanding room capacity'],

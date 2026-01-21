@@ -80,6 +80,15 @@ class WarehouseStockController extends Controller
             ['quantity' => $validated['quantity']]
         );
 
+        // Check if any rooms have this product and might need layout refresh
+        $roomsWithProduct = RoomStock::where('product_id', $validated['product_id'])
+            ->where('quantity', '>', 0)
+            ->pluck('room_id')
+            ->unique()
+            ->toArray();
+
+        $layoutNeedsRefresh = !empty($roomsWithProduct);
+
         $response = [
             'success' => true,
             'message' => 'Stock updated successfully.',
@@ -90,22 +99,38 @@ class WarehouseStockController extends Controller
                 'previous_quantity' => $previousQuantity,
                 'quantity_added' => $quantityAdded,
             ],
+            'layout_updated' => $layoutNeedsRefresh,
+            'affected_rooms' => $roomsWithProduct,
         ];
 
         // Generate storage suggestions if quantity was added
         if ($quantityAdded > 0) {
-            $suggestions = $this->suggestionService->generateSuggestions(
-                $product->id,
-                $quantityAdded
-            );
+            try {
+                $suggestions = $this->suggestionService->generateSuggestions(
+                    $product->id,
+                    $quantityAdded
+                );
 
-            if (! isset($suggestions['error'])) {
-                $feedback = $this->feedbackService->generateFeedback($suggestions);
+                if (! isset($suggestions['error'])) {
+                    $feedback = $this->feedbackService->generateFeedback($suggestions);
 
-                $response['message'] = 'Stock updated successfully. Storage suggestions available.';
-                $response['storage_suggestions'] = array_merge($suggestions, $feedback);
-            } else {
-                $response['storage_suggestions'] = $suggestions;
+                    $response['message'] = 'Stock updated successfully. Storage suggestions available.';
+                    $response['storage_suggestions'] = array_merge($suggestions, $feedback);
+                } else {
+                    $response['storage_suggestions'] = $suggestions;
+                }
+            } catch (\Exception $e) {
+                Log::error('Error generating storage suggestions', [
+                    'product_id' => $product->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                
+                // Don't fail the stock update if suggestions fail
+                $response['storage_suggestions'] = [
+                    'error' => 'Failed to generate storage suggestions',
+                    'message' => $e->getMessage(),
+                ];
             }
         }
 

@@ -20,6 +20,11 @@ class Room extends Model
         'warehouse_id',
         'status',
         'max_weight',
+        'door_x',
+        'door_y',
+        'door_width',
+        'door_height',
+        'door_wall',
     ];
 
     protected function casts(): array
@@ -29,6 +34,10 @@ class Room extends Model
             'depth' => 'decimal:2',
             'height' => 'decimal:2',
             'max_weight' => 'decimal:2',
+            'door_x' => 'decimal:2',
+            'door_y' => 'decimal:2',
+            'door_width' => 'decimal:2',
+            'door_height' => 'decimal:2',
         ];
     }
 
@@ -55,5 +64,25 @@ class Room extends Model
     public function getFloorAreaAttribute(): float
     {
         return $this->width * $this->depth;
+    }
+
+    /**
+     * Get door configuration as array.
+     *
+     * @return array|null
+     */
+    public function getDoorAttribute(): ?array
+    {
+        if (!$this->door_x) {
+            return null;
+        }
+
+        return [
+            'x' => $this->door_x,
+            'y' => $this->door_y,
+            'width' => $this->door_width,
+            'height' => $this->door_height,
+            'wall' => $this->door_wall,
+        ];
     }
 }

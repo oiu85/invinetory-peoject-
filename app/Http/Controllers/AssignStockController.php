@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Room;
 use App\Models\RoomStock;
 use App\Models\ItemPlacement;
+use App\Models\RoomLayout;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -109,11 +110,17 @@ class AssignStockController extends Controller
 
             DB::commit();
 
+            // Check if layout needs refresh (items were removed from room)
+            $layoutNeedsRefresh = true; // Always true when items are removed
+            $latestLayout = RoomLayout::where('room_id', $room->id)->latest()->first();
+
             return response()->json([
                 'message' => 'Stock assigned successfully',
                 'driver_stock' => $driverStock->fresh(['product', 'driver']),
                 'room_id' => $room->id,
                 'removed_from_room' => $validated['quantity'],
+                'layout_updated' => $layoutNeedsRefresh,
+                'layout_id' => $latestLayout?->id,
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();

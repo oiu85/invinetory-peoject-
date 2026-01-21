@@ -10,6 +10,9 @@ use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Services\Layout\LayoutValidator;
 use App\Services\Packing\LAFFPackingService;
+use App\Services\Packing\CompartmentPackingService;
+use App\Services\Packing\CompartmentManager;
+use App\Models\WarehouseStock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +21,9 @@ class RoomLayoutController extends Controller
 {
     public function __construct(
         private LAFFPackingService $packingService,
-        private LayoutValidator $layoutValidator
+        private CompartmentPackingService $compartmentPackingService,
+        private LayoutValidator $layoutValidator,
+        private CompartmentManager $compartmentManager
     ) {
     }
 
@@ -46,6 +51,9 @@ class RoomLayoutController extends Controller
                 'total_items_placed' => $layout->total_items_placed,
                 'total_items_attempted' => $layout->total_items_attempted,
                 'layout_data' => $layout->layout_data,
+                'compartment_config' => $layout->compartment_config,
+                'grid_columns' => $layout->grid_columns,
+                'grid_rows' => $layout->grid_rows,
                 'placements' => $layout->placements,
                 'created_at' => $layout->created_at,
                 'updated_at' => $layout->updated_at,
@@ -60,31 +68,31 @@ class RoomLayoutController extends Controller
 
     public function generate(GenerateLayoutRequest $request, int $id): JsonResponse
     {
-        $room = Room::findOrFail($id);
+        try {
+            $room = Room::findOrFail($id);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Room not found',
+                'message' => $e->getMessage(),
+            ], 404);
+        }
 
+        // Log the incoming request for debugging
+        \Log::info('Layout generation request', [
+            'room_id' => $id,
+            'request_data' => $request->all(),
+        ]);
+
+        // FormRequest automatically validates and throws ValidationException
+        // If we reach here, validation passed
         $validated = $request->validated();
-        $algorithm = $validated['algorithm'] ?? 'laff_maxrects';
+        $algorithm = $validated['algorithm'] ?? 'compartment';
         // Rotation is always disabled in simplified 2D mode
         $allowRotation = false;
         $items = $validated['items'];
         $options = $validated['options'] ?? [];
 
-        // Guardrail: cap expanded total items to keep runtime and DB writes bounded.
-        $expandedTotal = 0;
-        foreach ($items as $item) {
-            $expandedTotal += (int) ($item['quantity'] ?? 0);
-        }
-
-        if ($expandedTotal > 500) {
-            return response()->json([
-                'error' => 'Too many items requested',
-                'message' => 'Total requested quantity exceeds the maximum allowed (500). Reduce quantities or apply caps.',
-                'max_total_items' => 500,
-                'requested_total' => $expandedTotal,
-            ], 422);
-        }
-
-        // Prepare items with dimensions
+        // Validate quantities against warehouse stock (max per product)
         $preparedItems = [];
         foreach ($items as $item) {
             $product = Product::findOrFail($item['product_id']);
@@ -98,26 +106,63 @@ class RoomLayoutController extends Controller
                 ], 400);
             }
 
+            // Get max available quantity from warehouse stock
+            $warehouseStock = WarehouseStock::where('product_id', $item['product_id'])->first();
+            $maxQuantity = $warehouseStock?->quantity ?? 0;
+            $requestedQuantity = (int) ($item['quantity'] ?? 0);
+
+            if ($requestedQuantity > $maxQuantity) {
+                return response()->json([
+                    'error' => 'Insufficient warehouse stock',
+                    'product_id' => $item['product_id'],
+                    'product_name' => $product->name,
+                    'message' => "Requested quantity ({$requestedQuantity}) exceeds available warehouse stock ({$maxQuantity})",
+                    'requested_quantity' => $requestedQuantity,
+                    'max_available' => $maxQuantity,
+                ], 422);
+            }
+
             $preparedItems[] = [
                 'product_id' => $item['product_id'],
-                'quantity' => $item['quantity'],
-                'width' => $item['dimensions']['width'] ?? $dimension->width,
-                'depth' => $item['dimensions']['depth'] ?? $dimension->depth,
-                'height' => $item['dimensions']['height'] ?? $dimension->height,
+                'quantity' => $requestedQuantity,
+                'width' => $dimension->width,
+                'depth' => $dimension->depth,
+                'height' => $dimension->height,
             ];
         }
 
-        // Generate layout (simplified 2D mode: no rotation, floor-only)
+        // Calculate expanded total for statistics
+        $expandedTotal = 0;
+        foreach ($preparedItems as $item) {
+            $expandedTotal += $item['quantity'];
+        }
+
+        // Generate layout using compartment algorithm
         try {
-            $result = $this->packingService->pack(
-                $preparedItems,
-                $room->width,
-                $room->depth,
-                $room->height,
-                [
-                    'prefer_bottom' => $options['prefer_bottom'] ?? true,
-                ]
-            );
+            $packingOptions = [
+                'prefer_bottom' => $options['prefer_bottom'] ?? true,
+                'column_max_height' => $options['column_max_height'] ?? $room->height,
+                'grid' => $options['grid'] ?? [],
+            ];
+
+            if ($algorithm === 'compartment' || $algorithm === 'compartment_grid') {
+                $result = $this->compartmentPackingService->pack(
+                    $preparedItems,
+                    $room->width,
+                    $room->depth,
+                    $room->height,
+                    $packingOptions
+                );
+            } else {
+                // Fallback to LAFF for non-compartment algorithms
+                $result = $this->packingService->pack(
+                    $preparedItems,
+                    $room->width,
+                    $room->depth,
+                    $room->height,
+                    $packingOptions
+                );
+            }
         } catch (\Exception $e) {
             \Log::error('Packing service error', [
                 'room_id' => $id,
@@ -158,20 +203,31 @@ class RoomLayoutController extends Controller
         // Save layout to database
         DB::beginTransaction();
         try {
+            $layoutData = [
+                'version' => '1.0',
+                'algorithm' => $algorithm,
+                'utilization' => $result['utilization'],
+                'computed_at' => now()->toIso8601String(),
+                'placements' => $result['placements'],
+                'unplaced_items' => $result['unplaced_items'],
+            ];
+
+            // Add compartment and grid data if using compartment algorithm
+            if (isset($result['compartments']) && isset($result['grid'])) {
+                $layoutData['compartments'] = $result['compartments'];
+                $layoutData['grid'] = $result['grid'];
+            }
+
             $layout = RoomLayout::create([
                 'room_id' => $room->id,
                 'algorithm_used' => $algorithm,
                 'utilization_percentage' => $result['utilization'],
                 'total_items_placed' => count($result['placements']),
                 'total_items_attempted' => $expandedTotal,
-                'layout_data' => [
-                    'version' => '1.0',
-                    'algorithm' => $algorithm,
-                    'utilization' => $result['utilization'],
-                    'computed_at' => now()->toIso8601String(),
-                    'placements' => $result['placements'],
-                    'unplaced_items' => $result['unplaced_items'],
-                ],
+                'layout_data' => $layoutData,
+                'compartment_config' => isset($result['compartments']) ? ['compartments' => $result['compartments']] : null,
+                'grid_columns' => $result['grid']['columns'] ?? null,
+                'grid_rows' => $result['grid']['rows'] ?? null,
             ]);
 
             // Create item placements
@@ -401,5 +457,124 @@ class RoomLayoutController extends Controller
         $placement->delete();
 
         return response()->json(['message' => 'Placement deleted successfully']);
+    }
+
+    /**
+     * Refresh layout for a room (recalculate based on current room stock).
+     */
+    public function refresh(int $id): JsonResponse
+    {
+        $room = Room::findOrFail($id);
+
+        // Get current room stock
+        $roomStocks = \App\Models\RoomStock::where('room_id', $room->id)
+            ->where('quantity', '>', 0)
+            ->with('product.productDimension')
+            ->get();
+
+        if ($roomStocks->isEmpty()) {
+            return response()->json([
+                'message' => 'No stock in room to generate layout',
+                'room_id' => $room->id,
+            ], 400);
+        }
+
+        // Prepare items from room stock
+        $items = [];
+        foreach ($roomStocks as $roomStock) {
+            $dimension = $roomStock->product->productDimension;
+            if (!$dimension) {
+                continue;
+            }
+
+            $items[] = [
+                'product_id' => $roomStock->product_id,
+                'quantity' => $roomStock->quantity,
+                'width' => $dimension->width,
+                'depth' => $dimension->depth,
+                'height' => $dimension->height,
+            ];
+        }
+
+        if (empty($items)) {
+            return response()->json([
+                'message' => 'No products with dimensions in room',
+                'room_id' => $room->id,
+            ], 400);
+        }
+
+        // Generate new layout using compartment algorithm
+        try {
+            $result = $this->compartmentPackingService->pack(
+                $items,
+                $room->width,
+                $room->depth,
+                $room->height,
+                ['prefer_bottom' => true]
+            );
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to refresh layout',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+
+        // Save new layout
+        DB::beginTransaction();
+        try {
+            // Delete old layouts
+            $room->layouts()->delete();
+
+            $layout = RoomLayout::create([
+                'room_id' => $room->id,
+                'algorithm_used' => 'compartment',
+                'utilization_percentage' => $result['utilization'],
+                'total_items_placed' => count($result['placements']),
+                'total_items_attempted' => array_sum(array_column($items, 'quantity')),
+                'layout_data' => [
+                    'version' => '1.0',
+                    'algorithm' => 'compartment',
+                    'utilization' => $result['utilization'],
+                    'computed_at' => now()->toIso8601String(),
+                    'placements' => $result['placements'],
+                    'unplaced_items' => $result['unplaced_items'],
+                    'compartments' => $result['compartments'] ?? [],
+                    'grid' => $result['grid'] ?? [],
+                ],
+                'compartment_config' => isset($result['compartments']) ? ['compartments' => $result['compartments']] : null,
+                'grid_columns' => $result['grid']['columns'] ?? null,
+                'grid_rows' => $result['grid']['rows'] ?? null,
+            ]);
+
+            foreach ($result['placements'] as $placement) {
+                ItemPlacement::create([
+                    'room_layout_id' => $layout->id,
+                    'product_id' => $placement['product_id'],
+                    'x_position' => $placement['x'],
+                    'y_position' => $placement['y'],
+                    'z_position' => $placement['z'],
+                    'width' => $placement['width'],
+                    'depth' => $placement['depth'],
+                    'height' => $placement['height'],
+                    'rotation' => '0',
+                    'layer_index' => $placement['layer_index'] ?? 0,
+                    'stack_id' => $placement['stack_id'] ?? null,
+                    'stack_position' => $placement['stack_position'] ?? 1,
+                    'stack_base_x' => $placement['stack_base_x'] ?? $placement['x'],
+                    'stack_base_y' => $placement['stack_base_y'] ?? $placement['y'],
+                    'items_below_count' => $placement['items_below_count'] ?? 0,
+                ]);
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Failed to save refreshed layout',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json($layout->load(['placements.product']));
     }
 }

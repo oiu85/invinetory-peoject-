@@ -15,6 +15,9 @@ class RoomLayout extends Model
         'total_items_placed',
         'total_items_attempted',
         'layout_data',
+        'compartment_config',
+        'grid_columns',
+        'grid_rows',
     ];
 
     protected function casts(): array
@@ -24,6 +27,9 @@ class RoomLayout extends Model
             'total_items_placed' => 'integer',
             'total_items_attempted' => 'integer',
             'layout_data' => 'array',
+            'compartment_config' => 'array',
+            'grid_columns' => 'integer',
+            'grid_rows' => 'integer',
         ];
     }
 
@@ -35,5 +41,28 @@ class RoomLayout extends Model
     public function placements(): HasMany
     {
         return $this->hasMany(ItemPlacement::class);
+    }
+
+    /**
+     * Get compartment configuration.
+     *
+     * @return array|null
+     */
+    public function getCompartmentsAttribute(): ?array
+    {
+        return $this->compartment_config;
+    }
+
+    /**
+     * Get grid dimensions.
+     *
+     * @return array
+     */
+    public function getGridAttribute(): array
+    {
+        return [
+            'columns' => $this->grid_columns ?? 0,
+            'rows' => $this->grid_rows ?? 0,
+        ];
     }
 }

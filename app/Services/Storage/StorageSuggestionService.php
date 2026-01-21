@@ -79,9 +79,9 @@ class StorageSuggestionService
                 'reason' => 'Optimal space utilization and existing product stack available',
             ] : null,
             'placement_options' => $bestRoom['placement_options'] ?? [],
-            'alternative_rooms' => array_filter($suggestions, function ($s) use ($bestRoom) {
-                return $s['room_id'] !== ($bestRoom['room_id'] ?? null);
-            }),
+            'alternative_rooms' => $bestRoom ? array_filter($suggestions, function ($s) use ($bestRoom) {
+                return isset($s['room_id']) && $s['room_id'] !== $bestRoom['room_id'];
+            }) : $suggestions,
         ];
     }
 

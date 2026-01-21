@@ -66,124 +66,132 @@ class FakerDataSeeder extends Seeder
             'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=800',
         ];
 
-        // Arabic product names for plastic bags warehouse
-        $plasticBagProducts = [
+        // Base product templates for generating 200 products
+        $productTemplates = [
             // Shopping Bags
-            ['name' => 'كيس تسوق كبير', 'price' => 2.50, 'category' => 0, 'description' => 'كيس تسوق بلاستيكي كبير الحجم، مناسب للاستخدام المتكرر'],
-            ['name' => 'كيس تسوق متوسط', 'price' => 1.75, 'category' => 0, 'description' => 'كيس تسوق بلاستيكي متوسط الحجم'],
-            ['name' => 'كيس تسوق صغير', 'price' => 1.00, 'category' => 0, 'description' => 'كيس تسوق بلاستيكي صغير الحجم'],
-            ['name' => 'كيس تسوق قوي', 'price' => 3.00, 'category' => 0, 'description' => 'كيس تسوق بلاستيكي عالي الجودة ومقاوم للتمزق'],
-            ['name' => 'كيس تسوق قابل لإعادة الاستخدام', 'price' => 4.50, 'category' => 0, 'description' => 'كيس تسوق بلاستيكي متين قابل لإعادة الاستخدام'],
-            
+            ['baseName' => 'كيس تسوق', 'basePrice' => 2.00, 'category' => 0, 'sizes' => ['صغير', 'متوسط', 'كبير', 'قوي', 'قابل لإعادة الاستخدام']],
             // Garbage Bags
-            ['name' => 'كيس قمامة 10 لتر', 'price' => 3.50, 'category' => 1, 'description' => 'كيس قمامة بلاستيكي سعة 10 لتر'],
-            ['name' => 'كيس قمامة 20 لتر', 'price' => 5.00, 'category' => 1, 'description' => 'كيس قمامة بلاستيكي سعة 20 لتر'],
-            ['name' => 'كيس قمامة 30 لتر', 'price' => 6.50, 'category' => 1, 'description' => 'كيس قمامة بلاستيكي سعة 30 لتر'],
-            ['name' => 'كيس قمامة 50 لتر', 'price' => 8.00, 'category' => 1, 'description' => 'كيس قمامة بلاستيكي سعة 50 لتر'],
-            ['name' => 'كيس قمامة 100 لتر', 'price' => 12.00, 'category' => 1, 'description' => 'كيس قمامة بلاستيكي سعة 100 لتر'],
-            ['name' => 'كيس قمامة معزز', 'price' => 7.00, 'category' => 1, 'description' => 'كيس قمامة بلاستيكي معزز ومقاوم للثقب'],
-            ['name' => 'كيس قمامة معطّر', 'price' => 4.50, 'category' => 1, 'description' => 'كيس قمامة بلاستيكي معطّر برائحة عطرة'],
-            
+            ['baseName' => 'كيس قمامة', 'basePrice' => 4.00, 'category' => 1, 'sizes' => ['10 لتر', '20 لتر', '30 لتر', '50 لتر', '100 لتر', 'معزز', 'معطّر']],
             // Food Bags
-            ['name' => 'كيس حفظ طعام صغير', 'price' => 1.50, 'category' => 2, 'description' => 'كيس بلاستيكي صغير لحفظ الطعام'],
-            ['name' => 'كيس حفظ طعام متوسط', 'price' => 2.00, 'category' => 2, 'description' => 'كيس بلاستيكي متوسط لحفظ الطعام'],
-            ['name' => 'كيس حفظ طعام كبير', 'price' => 2.75, 'category' => 2, 'description' => 'كيس بلاستيكي كبير لحفظ الطعام'],
-            ['name' => 'كيس تغليف ساندويتش', 'price' => 1.25, 'category' => 2, 'description' => 'كيس بلاستيكي لتغليف الساندويتشات'],
-            ['name' => 'كيس حفظ خضار', 'price' => 2.25, 'category' => 2, 'description' => 'كيس بلاستيكي لحفظ الخضروات'],
-            
+            ['baseName' => 'كيس حفظ طعام', 'basePrice' => 1.75, 'category' => 2, 'sizes' => ['صغير', 'متوسط', 'كبير', 'ساندويتش', 'خضار']],
             // Ziploc Bags
-            ['name' => 'كيس سحاب صغير', 'price' => 3.00, 'category' => 3, 'description' => 'كيس بلاستيكي بسحاب صغير الحجم'],
-            ['name' => 'كيس سحاب متوسط', 'price' => 4.50, 'category' => 3, 'description' => 'كيس بلاستيكي بسحاب متوسط الحجم'],
-            ['name' => 'كيس سحاب كبير', 'price' => 6.00, 'category' => 3, 'description' => 'كيس بلاستيكي بسحاب كبير الحجم'],
-            ['name' => 'كيس سحاب عائلي', 'price' => 8.00, 'category' => 3, 'description' => 'كيس بلاستيكي بسحاب عائلي الحجم'],
-            ['name' => 'كيس سحاب شفاف', 'price' => 4.00, 'category' => 3, 'description' => 'كيس بلاستيكي بسحاب شفاف عالي الجودة'],
-            
+            ['baseName' => 'كيس سحاب', 'basePrice' => 4.00, 'category' => 3, 'sizes' => ['صغير', 'متوسط', 'كبير', 'عائلي', 'شفاف']],
             // Freezer Bags
-            ['name' => 'كيس تجميد صغير', 'price' => 3.50, 'category' => 4, 'description' => 'كيس بلاستيكي خاص بالتجميد صغير الحجم'],
-            ['name' => 'كيس تجميد متوسط', 'price' => 5.00, 'category' => 4, 'description' => 'كيس بلاستيكي خاص بالتجميد متوسط الحجم'],
-            ['name' => 'كيس تجميد كبير', 'price' => 7.00, 'category' => 4, 'description' => 'كيس بلاستيكي خاص بالتجميد كبير الحجم'],
-            ['name' => 'كيس تجميد مقاوم للصقيع', 'price' => 8.50, 'category' => 4, 'description' => 'كيس بلاستيكي مقاوم للصقيع عالي الجودة'],
-            
+            ['baseName' => 'كيس تجميد', 'basePrice' => 5.00, 'category' => 4, 'sizes' => ['صغير', 'متوسط', 'كبير', 'مقاوم للصقيع']],
             // Medical Waste Bags
-            ['name' => 'كيس نفايات طبية صغير', 'price' => 5.50, 'category' => 5, 'description' => 'كيس نفايات طبية صغير الحجم'],
-            ['name' => 'كيس نفايات طبية متوسط', 'price' => 7.50, 'category' => 5, 'description' => 'كيس نفايات طبية متوسط الحجم'],
-            ['name' => 'كيس نفايات طبية كبير', 'price' => 10.00, 'category' => 5, 'description' => 'كيس نفايات طبية كبير الحجم'],
-            ['name' => 'كيس نفايات خطرة', 'price' => 12.00, 'category' => 5, 'description' => 'كيس نفايات خطرة معزز'],
-            
+            ['baseName' => 'كيس نفايات طبية', 'basePrice' => 7.00, 'category' => 5, 'sizes' => ['صغير', 'متوسط', 'كبير', 'خطرة']],
             // Packaging Bags
-            ['name' => 'كيس تغليف شفاف', 'price' => 2.00, 'category' => 6, 'description' => 'كيس تغليف بلاستيكي شفاف'],
-            ['name' => 'كيس تغليف ملون', 'price' => 2.50, 'category' => 6, 'description' => 'كيس تغليف بلاستيكي ملون'],
-            ['name' => 'كيس تغليف هدايا', 'price' => 3.50, 'category' => 6, 'description' => 'كيس تغليف بلاستيكي للهدايا'],
-            ['name' => 'كيس تغليف منتجات', 'price' => 2.25, 'category' => 6, 'description' => 'كيس تغليف بلاستيكي للمنتجات'],
-            
+            ['baseName' => 'كيس تغليف', 'basePrice' => 2.50, 'category' => 6, 'sizes' => ['شفاف', 'ملون', 'هدايا', 'منتجات']],
             // Agriculture Bags
-            ['name' => 'كيس زراعة صغير', 'price' => 1.75, 'category' => 7, 'description' => 'كيس بلاستيكي للزراعة صغير الحجم'],
-            ['name' => 'كيس زراعة متوسط', 'price' => 2.50, 'category' => 7, 'description' => 'كيس بلاستيكي للزراعة متوسط الحجم'],
-            ['name' => 'كيس زراعة كبير', 'price' => 3.50, 'category' => 7, 'description' => 'كيس بلاستيكي للزراعة كبير الحجم'],
-            ['name' => 'كيس شتلات', 'price' => 2.00, 'category' => 7, 'description' => 'كيس بلاستيكي للشتلات'],
+            ['baseName' => 'كيس زراعة', 'basePrice' => 2.25, 'category' => 7, 'sizes' => ['صغير', 'متوسط', 'كبير', 'شتلات']],
         ];
 
-        // Create Products
+        // Create 50 Products
         $products = [];
         $imageIndex = 0;
+        $targetProducts = 50;
         
-        foreach ($plasticBagProducts as $productData) {
-            $category = $categories[$productData['category']];
-            
-            $product = Product::create([
-                'name' => $productData['name'],
-                'price' => $productData['price'],
-                'category_id' => $category->id,
-                'description' => $productData['description'],
-                'image' => $unsplashImages[$imageIndex % count($unsplashImages)],
-            ]);
-            
-            $products[] = $product;
-            $imageIndex++;
-            
-            // Create small product dimensions for plastic bags/cartons
-            // Reduced size categories for better space utilization
-            $sizeCategories = [
-                // Small bags (shopping bags, small packaging)
-                ['width' => 10.0, 'depth' => 8.0, 'height' => 5.0, 'weight' => 0.1],
-                // Medium bags (medium shopping, garbage bags)
-                ['width' => 15.0, 'depth' => 12.0, 'height' => 8.0, 'weight' => 0.2],
-                // Large bags (large shopping, large garbage)
-                ['width' => 20.0, 'depth' => 18.0, 'height' => 12.0, 'weight' => 0.4],
-                // Extra large (industrial bags)
-                ['width' => 28.0, 'depth' => 25.0, 'height' => 18.0, 'weight' => 0.6],
-            ];
-            
-            // Select size category based on product index
-            $sizeCategory = $sizeCategories[$imageIndex % count($sizeCategories)];
-            
-            // Add small variations for realism (±1.5cm)
-            $width = $sizeCategory['width'] + $faker->randomFloat(1, -1.5, 1.5);
-            $depth = $sizeCategory['depth'] + $faker->randomFloat(1, -1.5, 1.5);
-            $height = $sizeCategory['height'] + $faker->randomFloat(1, -1.0, 1.0);
-            
-            // Ensure dimensions stay within small range (6-30cm)
-            $width = max(6.0, min(30.0, $width));
-            $depth = max(6.0, min(30.0, $depth));
-            $height = max(4.0, min(22.0, $height));
-            
-            ProductDimension::create([
-                'product_id' => $product->id,
-                'width' => round($width, 1),
-                'depth' => round($depth, 1),
-                'height' => round($height, 1),
-                'weight' => $sizeCategory['weight'] + $faker->randomFloat(2, 0, 0.5),
-                'rotatable' => true,
-                'fragile' => $faker->boolean(20), // 20% chance of being fragile
-            ]);
-            
-            // Create warehouse stock (random quantity between 100-1000 for bags)
-            WarehouseStock::create([
-                'product_id' => $product->id,
-                'quantity' => $faker->numberBetween(100, 1000),
-            ]);
+        // Size categories for dimensions
+        $sizeCategories = [
+            // Small bags (shopping bags, small packaging)
+            ['width' => 10.0, 'depth' => 8.0, 'height' => 5.0, 'weight' => 0.1],
+            // Medium bags (medium shopping, garbage bags)
+            ['width' => 15.0, 'depth' => 12.0, 'height' => 8.0, 'weight' => 0.2],
+            // Large bags (large shopping, large garbage)
+            ['width' => 20.0, 'depth' => 18.0, 'height' => 12.0, 'weight' => 0.4],
+            // Extra large (industrial bags)
+            ['width' => 28.0, 'depth' => 25.0, 'height' => 18.0, 'weight' => 0.6],
+        ];
+        
+        $productCount = 0;
+        while ($productCount < $targetProducts) {
+            foreach ($productTemplates as $template) {
+                if ($productCount >= $targetProducts) {
+                    break;
+                }
+                
+                $category = $categories[$template['category']];
+                
+                // Generate variations of each template
+                foreach ($template['sizes'] as $size) {
+                    if ($productCount >= $targetProducts) {
+                        break;
+                    }
+                    
+                    // Add variation number if needed
+                    $variation = '';
+                    if ($productCount > count($template['sizes']) * 2) {
+                        $variation = ' ' . ($faker->numberBetween(1, 5));
+                    }
+                    
+                    $productName = $template['baseName'] . ' ' . $size . $variation;
+                    $productPrice = $template['basePrice'] + $faker->randomFloat(2, -0.50, 2.00);
+                    $productPrice = max(0.50, $productPrice); // Ensure minimum price
+                    
+                    $product = Product::create([
+                        'name' => $productName,
+                        'price' => round($productPrice, 2),
+                        'category_id' => $category->id,
+                        'description' => $faker->sentence(10),
+                        'image' => $unsplashImages[$imageIndex % count($unsplashImages)],
+                    ]);
+                    
+                    $products[] = $product;
+                    $imageIndex++;
+                    $productCount++;
+                    
+                    // Select size category based on product index
+                    $sizeCategory = $sizeCategories[$productCount % count($sizeCategories)];
+                    
+                    // Add small variations for realism (±1.5cm)
+                    $width = $sizeCategory['width'] + $faker->randomFloat(1, -1.5, 1.5);
+                    $depth = $sizeCategory['depth'] + $faker->randomFloat(1, -1.5, 1.5);
+                    $height = $sizeCategory['height'] + $faker->randomFloat(1, -1.0, 1.0);
+                    
+                    // Ensure dimensions stay within small range (6-30cm)
+                    $width = max(6.0, min(30.0, $width));
+                    $depth = max(6.0, min(30.0, $depth));
+                    $height = max(4.0, min(22.0, $height));
+                    
+                    ProductDimension::create([
+                        'product_id' => $product->id,
+                        'width' => round($width, 1),
+                        'depth' => round($depth, 1),
+                        'height' => round($height, 1),
+                        'weight' => $sizeCategory['weight'] + $faker->randomFloat(2, 0, 0.5),
+                        'rotatable' => true,
+                        'fragile' => $faker->boolean(20), // 20% chance of being fragile
+                    ]);
+                    
+                    // Don't create stock here - we'll distribute 200 total items later
+                }
+            }
         }
-        $this->command->info('✅ تم إنشاء ' . count($products) . ' منتج مع مخزون المستودع');
+        
+        // Distribute exactly 200 total items across 50 products (4 items per product on average)
+        $totalItemsToDistribute = 200;
+        $productsCount = count($products);
+        
+        if ($productsCount > 0) {
+            // Calculate base quantity per product (200 items / 50 products = 4 items per product)
+            $baseQuantity = (int) floor($totalItemsToDistribute / $productsCount);
+            $remainder = $totalItemsToDistribute % $productsCount;
+            
+            // Shuffle products to randomize which ones get extra items
+            shuffle($products);
+            
+            foreach ($products as $index => $product) {
+                // Most products get base quantity (4), first 'remainder' products get +1 (5)
+                $quantity = $baseQuantity + ($index < $remainder ? 1 : 0);
+                
+                WarehouseStock::create([
+                    'product_id' => $product->id,
+                    'quantity' => $quantity,
+                ]);
+            }
+        }
+        
+        $this->command->info('✅ تم إنشاء ' . count($products) . ' منتج مع إجمالي ' . $totalItemsToDistribute . ' عنصر في المخزون');
 
         // Create Drivers with Arabic names
         $arabicNames = [

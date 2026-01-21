@@ -130,12 +130,15 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     // Rooms CRUD
     Route::apiResource('rooms', RoomController::class);
     Route::get('rooms/{id}/stats', [RoomController::class, 'stats']);
+    Route::get('rooms/{id}/door', [RoomController::class, 'getDoor']);
+    Route::put('rooms/{id}/door', [RoomController::class, 'updateDoor']);
     
     // Layout Generation
     Route::post('rooms/{id}/generate-layout', [RoomLayoutController::class, 'generate']);
     Route::get('rooms/{id}/layout', [RoomLayoutController::class, 'show']);
     Route::put('rooms/{id}/layout', [RoomLayoutController::class, 'update']);
     Route::post('rooms/{id}/layout/optimize', [RoomLayoutController::class, 'optimize']);
+    Route::post('rooms/{id}/layout/refresh', [RoomLayoutController::class, 'refresh']);
     Route::delete('rooms/{id}/layout', [RoomLayoutController::class, 'destroy']);
     
     // Product Dimensions

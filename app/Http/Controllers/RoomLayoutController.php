@@ -12,6 +12,8 @@ use App\Services\Layout\LayoutValidator;
 use App\Services\Packing\LAFFPackingService;
 use App\Services\Packing\CompartmentPackingService;
 use App\Services\Packing\CompartmentManager;
+use App\Services\Validation\RoomValidationService;
+use App\Services\Validation\StockValidationService;
 use App\Models\WarehouseStock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +25,9 @@ class RoomLayoutController extends Controller
         private LAFFPackingService $packingService,
         private CompartmentPackingService $compartmentPackingService,
         private LayoutValidator $layoutValidator,
-        private CompartmentManager $compartmentManager
+        private CompartmentManager $compartmentManager,
+        private RoomValidationService $roomValidationService,
+        private StockValidationService $stockValidationService
     ) {
     }
 
@@ -64,6 +68,83 @@ class RoomLayoutController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Validate room and products before layout generation.
+     */
+    public function validateBeforeGeneration(Request $request, int $id): JsonResponse
+    {
+        try {
+            $room = Room::findOrFail($id);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Room not found',
+                'message' => $e->getMessage(),
+            ], 404);
+        }
+
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        $items = $request->input('items', []);
+
+        // Prepare items with dimensions
+        $itemsWithDimensions = [];
+        foreach ($items as $item) {
+            $product = Product::find($item['product_id']);
+            if (!$product) continue;
+
+            $dimension = $product->productDimension;
+            if (!$dimension) {
+                return response()->json([
+                    'error' => 'Product dimensions not found',
+                    'product_id' => $item['product_id'],
+                    'message' => "Product '{$product->name}' does not have dimensions defined",
+                ], 400);
+            }
+
+            $itemsWithDimensions[] = [
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity'],
+                'width' => $dimension->width,
+                'depth' => $dimension->depth,
+                'height' => $dimension->height,
+            ];
+        }
+
+        // Validate room for products
+        $roomValidation = $this->roomValidationService->validateRoomForProducts($room, $itemsWithDimensions);
+
+        // Validate stock
+        $stockValidation = $this->stockValidationService->validateQuantitiesAgainstStock($items, $room->id);
+
+        // Calculate theoretical capacity
+        $capacity = $this->roomValidationService->calculateTheoreticalCapacity($room, $itemsWithDimensions);
+
+        // Get suggestions
+        $suggestions = $this->stockValidationService->suggestOptimalQuantities(
+            $itemsWithDimensions,
+            $room->width,
+            $room->depth,
+            $room->height,
+            $room->id
+        );
+
+        // Pre-generation validation using LayoutValidator
+        $preValidation = $this->layoutValidator->validateBeforeGeneration($room, $itemsWithDimensions);
+
+        return response()->json([
+            'valid' => $roomValidation['valid'] && $stockValidation['valid'],
+            'room_validation' => $roomValidation,
+            'stock_validation' => $stockValidation,
+            'capacity' => $capacity,
+            'suggestions' => $suggestions,
+            'pre_generation_validation' => $preValidation,
+        ]);
     }
 
     public function generate(GenerateLayoutRequest $request, int $id): JsonResponse

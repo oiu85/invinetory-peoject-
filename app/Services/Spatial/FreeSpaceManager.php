@@ -102,7 +102,10 @@ class FreeSpaceManager
         }
 
         // Remove redundant rectangles
-        $this->freeRectangles = $this->removeRedundant($newRects);
+        $newRects = $this->removeRedundant($newRects);
+        
+        // Merge small rectangles to optimize space management
+        $this->freeRectangles = $this->mergeSmallRectangles($newRects);
     }
 
     /**
@@ -199,6 +202,101 @@ class FreeSpaceManager
     public function getFreeRectangles(): array
     {
         return $this->freeRectangles;
+    }
+
+    /**
+     * Merge small rectangles to optimize space management.
+     *
+     * @param array<Rectangle> $rects
+     * @return array<Rectangle>
+     */
+    private function mergeSmallRectangles(array $rects): array
+    {
+        $minArea = 100; // Minimum area threshold (100 cm²)
+        $merged = [];
+        $processed = [];
+
+        foreach ($rects as $i => $rect) {
+            if (isset($processed[$i])) {
+                continue;
+            }
+
+            // If rectangle is large enough, keep it
+            if ($rect->getArea() >= $minArea) {
+                $merged[] = $rect;
+                $processed[$i] = true;
+                continue;
+            }
+
+            // Try to merge with adjacent small rectangles
+            $mergedRect = $rect;
+            foreach ($rects as $j => $other) {
+                if ($i === $j || isset($processed[$j])) {
+                    continue;
+                }
+
+                // Check if rectangles are adjacent and can be merged
+                if ($this->canMerge($mergedRect, $other)) {
+                    $mergedRect = $this->mergeRectangles($mergedRect, $other);
+                    $processed[$j] = true;
+                }
+            }
+
+            $merged[] = $mergedRect;
+            $processed[$i] = true;
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Check if two rectangles can be merged.
+     */
+    private function canMerge(Rectangle $a, Rectangle $b): bool
+    {
+        // Check if rectangles are adjacent (share an edge)
+        $tolerance = 1.0; // 1cm tolerance
+
+        // Check if same X and adjacent Y
+        if (abs($a->x - $b->x) < $tolerance &&
+            abs($a->width - $b->width) < $tolerance) {
+            $aTop = $a->y + $a->depth;
+            $bTop = $b->y + $b->depth;
+            if (abs($aTop - $b->y) < $tolerance || abs($bTop - $a->y) < $tolerance) {
+                return true;
+            }
+        }
+
+        // Check if same Y and adjacent X
+        if (abs($a->y - $b->y) < $tolerance &&
+            abs($a->depth - $b->depth) < $tolerance) {
+            $aRight = $a->x + $a->width;
+            $bRight = $b->x + $b->width;
+            if (abs($aRight - $b->x) < $tolerance || abs($bRight - $a->x) < $tolerance) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Merge two rectangles.
+     */
+    private function mergeRectangles(Rectangle $a, Rectangle $b): Rectangle
+    {
+        $minX = min($a->x, $b->x);
+        $minY = min($a->y, $b->y);
+        $maxX = max($a->x + $a->width, $b->x + $b->width);
+        $maxY = max($a->y + $a->depth, $b->y + $b->depth);
+
+        return new Rectangle(
+            $minX,
+            $minY,
+            $maxX - $minX,
+            $maxY - $minY,
+            max($a->height, $b->height)
+        );
     }
 
     /**

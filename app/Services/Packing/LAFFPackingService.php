@@ -11,7 +11,8 @@ use App\Services\Spatial\FreeSpaceManager;
 class LAFFPackingService implements PackingServiceInterface
 {
     public function __construct(
-        private CollisionDetector $collisionDetector
+        private CollisionDetector $collisionDetector,
+        private ?PlacementStrategyService $placementStrategyService = null
     ) {
     }
 
@@ -35,20 +36,43 @@ class LAFFPackingService implements PackingServiceInterface
         // Expand items by quantity
         $expandedItems = $this->expandItems($items);
 
-        // Sort by base area (largest first) - LAFF algorithm
-        usort($expandedItems, function ($a, $b) {
+        // Enhanced prioritization: sort by multiple criteria
+        usort($expandedItems, function ($a, $b) use ($options) {
+            // Priority 1: By size (largest first) - LAFF algorithm
             $areaA = $a['width'] * $a['depth'];
             $areaB = $b['width'] * $b['depth'];
 
-            if (abs($areaA - $areaB) < 0.01) {
-                // Tiebreaker: taller items first
-                return $b['height'] <=> $a['height'];
+            if (abs($areaA - $areaB) > 0.01) {
+                return $areaB <=> $areaA;
             }
 
-            return $areaB <=> $areaA;
+            // Priority 2: By quantity (if available)
+            $qtyA = $a['quantity'] ?? 1;
+            $qtyB = $b['quantity'] ?? 1;
+            if ($qtyA !== $qtyB) {
+                return $qtyB <=> $qtyA; // Higher quantity first
+            }
+
+            // Priority 3: By aspect ratio matching (prefer items that match room aspect)
+            $roomAspect = ($options['room_width'] ?? 1) / ($options['room_depth'] ?? 1);
+            $aspectA = $a['width'] / max($a['depth'], 0.01);
+            $aspectB = $b['width'] / max($b['depth'], 0.01);
+            $matchA = 1 - abs($aspectA - $roomAspect);
+            $matchB = 1 - abs($aspectB - $roomAspect);
+            if (abs($matchA - $matchB) > 0.01) {
+                return $matchB <=> $matchA;
+            }
+
+            // Priority 4: Taller items first (for better stacking)
+            return $b['height'] <=> $a['height'];
         });
 
         $freeSpaceManager = new FreeSpaceManager($roomWidth, $roomDepth, $roomHeight);
+        
+        // Store room dimensions in options for prioritization
+        $options['room_width'] = $roomWidth;
+        $options['room_depth'] = $roomDepth;
+        $options['room_height'] = $roomHeight;
         $placements = [];
         $unplacedItems = [];
         $placedBoxes = [];
@@ -57,16 +81,38 @@ class LAFFPackingService implements PackingServiceInterface
         $stackMap = [];
 
         foreach ($expandedItems as $item) {
-            $placed = $this->placeItem(
-                $item,
-                $freeSpaceManager,
-                $roomWidth,
-                $roomDepth,
-                $roomHeight,
-                $placedBoxes,
-                $placements, // Pass existing placements for stack checking
-                $stackMap // Pass stack map for faster lookup
-            );
+            // Try using PlacementStrategyService if available
+            $placed = null;
+            if ($this->placementStrategyService) {
+                try {
+                    $strategyResult = $this->placementStrategyService->findBestPlacement(
+                        $item,
+                        $freeSpaceManager,
+                        $placedBoxes,
+                        $roomWidth,
+                        $roomDepth,
+                        $roomHeight
+                    );
+                    $placed = $strategyResult['placement'];
+                } catch (\Exception $e) {
+                    // Fallback to default placement
+                    $placed = null;
+                }
+            }
+            
+            // Fallback to default placement if strategy service not available or failed
+            if (!$placed) {
+                $placed = $this->placeItem(
+                    $item,
+                    $freeSpaceManager,
+                    $roomWidth,
+                    $roomDepth,
+                    $roomHeight,
+                    $placedBoxes,
+                    $placements, // Pass existing placements for stack checking
+                    $stackMap // Pass stack map for faster lookup
+                );
+            }
 
             if ($placed) {
                 $placements[] = $placed;

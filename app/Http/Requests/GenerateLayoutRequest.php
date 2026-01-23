@@ -3,12 +3,94 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use App\Services\Validation\RoomValidationService;
+use App\Services\Validation\StockValidationService;
+use App\Models\Room;
+use App\Models\Product;
+use App\Models\ProductDimension;
 
 class GenerateLayoutRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * Configure the validator instance.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function ($validator) {
+            $roomId = $this->route('id');
+            if (!$roomId) {
+                return;
+            }
+
+            $room = Room::find($roomId);
+            if (!$room) {
+                $validator->errors()->add('room', 'Room not found');
+                return;
+            }
+
+            // Validate room dimensions
+            $roomValidationService = app(RoomValidationService::class);
+            $roomDimValidation = $roomValidationService->validateRoomDimensions($room);
+            if (!$roomDimValidation['valid']) {
+                foreach ($roomDimValidation['errors'] as $error) {
+                    $validator->errors()->add('room', $error);
+                }
+            }
+
+            // Validate products and stock
+            $items = $this->input('items', []);
+            if (empty($items)) {
+                return;
+            }
+
+            // Prepare items with dimensions for validation
+            $itemsWithDimensions = [];
+            foreach ($items as $item) {
+                $productId = $item['product_id'] ?? null;
+                if (!$productId) continue;
+
+                $product = Product::find($productId);
+                if (!$product) continue;
+
+                $dimension = ProductDimension::where('product_id', $productId)->first();
+                if (!$dimension) {
+                    $validator->errors()->add("items.{$productId}", "Product #{$productId} does not have dimensions defined");
+                    continue;
+                }
+
+                $itemsWithDimensions[] = [
+                    'product_id' => $productId,
+                    'quantity' => $item['quantity'] ?? 1,
+                    'width' => $dimension->width,
+                    'depth' => $dimension->depth,
+                    'height' => $dimension->height,
+                ];
+            }
+
+            // Validate products fit in room
+            $productValidation = $roomValidationService->validateRoomForProducts($room, $itemsWithDimensions);
+            if (!$productValidation['valid']) {
+                foreach ($productValidation['errors'] as $error) {
+                    $validator->errors()->add('items', $error);
+                }
+            }
+
+            // Validate stock availability
+            $stockValidationService = app(StockValidationService::class);
+            $stockValidation = $stockValidationService->validateQuantitiesAgainstStock($items, $roomId);
+            if (!$stockValidation['valid']) {
+                foreach ($stockValidation['errors'] as $error) {
+                    $validator->errors()->add('items', $error);
+                }
+            }
+        });
     }
 
     public function rules(): array
@@ -75,6 +157,21 @@ class GenerateLayoutRequest extends FormRequest
             'items.*.quantity.required' => 'Quantity is required for each item.',
             'items.*.quantity.integer' => 'Quantity must be a whole number.',
             'items.*.quantity.min' => 'Quantity must be at least 1.',
+            'room' => 'Room validation failed.',
         ];
+    }
+
+    /**
+     * Handle a failed validation attempt.
+     */
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(
+            response()->json([
+                'error' => 'Validation failed',
+                'message' => 'The request data is invalid. Please check the errors.',
+                'errors' => $validator->errors(),
+            ], 422)
+        );
     }
 }

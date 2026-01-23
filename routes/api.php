@@ -140,6 +140,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::put('rooms/{id}/door', [RoomController::class, 'updateDoor']);
     
     // Layout Generation
+    Route::post('rooms/{id}/validate-layout', [RoomLayoutController::class, 'validateBeforeGeneration']);
     Route::post('rooms/{id}/generate-layout', [RoomLayoutController::class, 'generate']);
     Route::get('rooms/{id}/layout', [RoomLayoutController::class, 'show']);
     Route::put('rooms/{id}/layout', [RoomLayoutController::class, 'update']);

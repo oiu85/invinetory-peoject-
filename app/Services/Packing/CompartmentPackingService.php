@@ -10,7 +10,9 @@ class CompartmentPackingService implements PackingServiceInterface
 {
     public function __construct(
         private CollisionDetector $collisionDetector,
-        private CompartmentManager $compartmentManager
+        private CompartmentManager $compartmentManager,
+        private ?ProductGroupingService $productGroupingService = null,
+        private ?PlacementStrategyService $placementStrategyService = null
     ) {
     }
 
@@ -37,14 +39,42 @@ class CompartmentPackingService implements PackingServiceInterface
         // Group items by product_id
         $itemsByProduct = $this->groupByProduct($expandedItems);
 
-        // Calculate grid dimensions
+        // Calculate grid dimensions using smart grid calculator
         $numProducts = count($itemsByProduct);
-        $gridConfig = $this->compartmentManager->calculateGrid(
-            $roomWidth,
-            $roomDepth,
-            $numProducts,
-            $options['grid'] ?? []
-        );
+        
+        // Use smart grid calculation if items are provided
+        if (!empty($items) && method_exists($this->compartmentManager, 'calculateOptimalGrid')) {
+            try {
+                $optimalGrid = $this->compartmentManager->calculateOptimalGrid(
+                    $items,
+                    $roomWidth,
+                    $roomDepth,
+                    $roomHeight,
+                    array_merge($options, ['items' => $items])
+                );
+                $gridConfig = [
+                    'columns' => $optimalGrid['columns'],
+                    'rows' => $optimalGrid['rows'],
+                    'cell_width' => $optimalGrid['cell_width'],
+                    'cell_depth' => $optimalGrid['cell_depth'],
+                ];
+            } catch (\Exception $e) {
+                // Fallback to simple grid calculation
+                $gridConfig = $this->compartmentManager->calculateGrid(
+                    $roomWidth,
+                    $roomDepth,
+                    $numProducts,
+                    array_merge($options['grid'] ?? [], ['items' => $items, 'room_height' => $roomHeight])
+                );
+            }
+        } else {
+            $gridConfig = $this->compartmentManager->calculateGrid(
+                $roomWidth,
+                $roomDepth,
+                $numProducts,
+                array_merge($options['grid'] ?? [], ['items' => $items, 'room_height' => $roomHeight])
+            );
+        }
 
         $maxColumnHeight = $options['column_max_height'] ?? $roomHeight;
         $placements = [];
@@ -91,10 +121,22 @@ class CompartmentPackingService implements PackingServiceInterface
                 continue;
             }
             
+            // Adaptive cell sizing: adjust based on product dimensions
             $gridCellWidth = $firstItem['width'];
             $gridCellDepth = $firstItem['depth'];
-            $maxColumnsInCompartment = max(1, (int) floor($compartmentBoundary['width'] / $gridCellWidth));
-            $maxRowsInCompartment = max(1, (int) floor($compartmentBoundary['depth'] / $gridCellDepth));
+            
+            // Allow cells to expand/contract within limits (10% margin)
+            $minCellWidth = $gridCellWidth * 0.9;
+            $maxCellWidth = min($compartmentBoundary['width'], $gridCellWidth * 1.5);
+            $minCellDepth = $gridCellDepth * 0.9;
+            $maxCellDepth = min($compartmentBoundary['depth'], $gridCellDepth * 1.5);
+            
+            // Optimize cell size for minimal waste
+            $optimalCellWidth = min($maxCellWidth, max($minCellWidth, $gridCellWidth));
+            $optimalCellDepth = min($maxCellDepth, max($minCellDepth, $gridCellDepth));
+            
+            $maxColumnsInCompartment = max(1, (int) floor($compartmentBoundary['width'] / $optimalCellWidth));
+            $maxRowsInCompartment = max(1, (int) floor($compartmentBoundary['depth'] / $optimalCellDepth));
             
             // Track stack heights for each grid position
             $gridStacks = []; // ['col_row' => ['z' => float, 'height' => float]]

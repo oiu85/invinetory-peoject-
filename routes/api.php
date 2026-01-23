@@ -11,6 +11,7 @@ use App\Http\Controllers\AssignStockController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\AdminStatsController;
 use App\Http\Controllers\DriverController;
+use App\Http\Controllers\DriverStatsController;
 use App\Http\Controllers\AdminSalesController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\RoomLayoutController;
@@ -83,9 +84,10 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::post('/assign-stock', [AssignStockController::class, 'store']);
 });
 
-// Driver viewing their own stock
+// Driver viewing their own stock and stats
 Route::middleware(['auth:sanctum', 'driver'])->group(function () {
     Route::get('/driver/my-stock', [DriverStockController::class, 'myStock']);
+    Route::get('/driver/stats', [DriverStatsController::class, 'index']);
 });
 
 // ============================================
@@ -119,6 +121,10 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/drivers', [DriverController::class, 'index']);
     Route::post('/admin/drivers', [DriverController::class, 'store']);
     Route::get('/admin/drivers/{id}', [DriverController::class, 'show']);
+    Route::get('/admin/drivers/{id}/analytics', [DriverController::class, 'analytics']);
+    Route::get('/admin/drivers/{id}/stock-history', [DriverController::class, 'stockHistory']);
+    Route::get('/admin/drivers/{id}/inventory', [DriverController::class, 'inventory']);
+    Route::get('/admin/drivers/{id}/settlement', [DriverController::class, 'settlement']);
     Route::put('/admin/drivers/{id}', [DriverController::class, 'update']);
     Route::delete('/admin/drivers/{id}', [DriverController::class, 'destroy']);
     Route::get('/admin/sales', [AdminSalesController::class, 'index']);

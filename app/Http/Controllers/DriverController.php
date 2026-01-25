@@ -10,8 +10,10 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
-use Dompdf\Dompdf;
-use Dompdf\Options;
+use Illuminate\Support\Facades\Log;
+use Omaralalwi\Gpdf\Gpdf;
+use Omaralalwi\Gpdf\GpdfConfig;
+use Omaralalwi\Gpdf\Enums\GpdfSettingKeys as GpdfSet;
 
 class DriverController extends Controller
 {
@@ -542,16 +544,25 @@ class DriverController extends Controller
             'sales' => $inventory['sales'],
         ])->render();
         
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
+        // Ensure UTF-8 encoding
+        $html = mb_convert_encoding($html, 'UTF-8', 'UTF-8');
         
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-        
-        $pdfContent = $dompdf->output();
+        // Use Gpdf for proper Arabic text support
+        try {
+            $config = new GpdfConfig([
+                'defaultPaperSize' => 'a4',
+                'defaultPaperOrientation' => 'portrait',
+            ]);
+            $gpdf = new Gpdf($config);
+            $pdfContent = $gpdf->generate($html);
+        } catch (\Exception $e) {
+            Log::error('Gpdf error: ' . $e->getMessage());
+            Log::error('Gpdf stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating PDF: ' . $e->getMessage(),
+            ], 500);
+        }
         
         $filename = 'settlement-' . $driver->name . '-' . $startDate . '-to-' . $endDate . '.pdf';
         

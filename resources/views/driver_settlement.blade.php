@@ -1,14 +1,35 @@
 <!DOCTYPE html>
-<html>
+<html dir="rtl" lang="ar">
 <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta charset="utf-8">
     <title>Driver Settlement - {{ $driver->name }}</title>
     <style>
+        @charset "UTF-8";
+        * {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+        }
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'DejaVu Sans', Arial, sans-serif;
             margin: 0;
             padding: 20px;
             color: #333;
+            direction: rtl;
+            unicode-bidi: embed;
+        }
+        .arabic-text {
+            direction: rtl;
+            unicode-bidi: bidi-override;
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            text-align: right;
+        }
+        .mixed-content {
+            unicode-bidi: embed;
+        }
+        /* Ensure Arabic text is properly rendered */
+        * {
+            -webkit-font-feature-settings: "liga" off;
+            font-feature-settings: "liga" off;
         }
         .header {
             text-align: center;
@@ -56,7 +77,7 @@
         }
         th, td {
             padding: 12px;
-            text-align: left;
+            text-align: right;
             border-bottom: 1px solid #ddd;
         }
         th {
@@ -81,7 +102,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>تسوية حساب السائق / Driver Settlement</h1>
+        <h1><span class="arabic-text">تسوية حساب السائق</span> / Driver Settlement</h1>
         <h2>{{ $driver->name }}</h2>
     </div>
 

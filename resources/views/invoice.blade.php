@@ -1,14 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html dir="rtl" lang="ar">
 <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta charset="utf-8">
     <title>Invoice {{ $sale->invoice_number }}</title>
     <style>
+        @charset "UTF-8";
+        * {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+        }
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'DejaVu Sans', Arial, sans-serif;
             margin: 0;
             padding: 20px;
             color: #333;
+            direction: rtl;
         }
         .header {
             text-align: center;

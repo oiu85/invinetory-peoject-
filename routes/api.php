@@ -17,6 +17,7 @@ use App\Http\Controllers\RoomController;
 use App\Http\Controllers\RoomLayoutController;
 use App\Http\Controllers\ProductDimensionController;
 use App\Http\Controllers\RoomVisualizationController;
+use App\Http\Controllers\DriverDashboardController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -33,6 +34,11 @@ Route::get('/health', function () {
 Route::post('/login', [AuthController::class, 'login']); // General login (admin or driver)
 Route::post('/driver/login', [AuthController::class, 'driverLogin']); // Driver specific login
 Route::post('/admin/login', [AuthController::class, 'adminLogin']); // Admin specific login
+
+// Password reset routes (no auth required)
+Route::post('/driver/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/driver/reset-password', [AuthController::class, 'resetPassword']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
@@ -87,7 +93,11 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 // Driver viewing their own stock and stats
 Route::middleware(['auth:sanctum', 'driver'])->group(function () {
     Route::get('/driver/my-stock', [DriverStockController::class, 'myStock']);
+    // More specific routes must come before parameterized routes
+    Route::get('/driver/my-stock/statistics', [DriverStockController::class, 'stockStatistics']);
+    Route::get('/driver/my-stock/{productId}', [DriverStockController::class, 'stockDetail']);
     Route::get('/driver/stats', [DriverStatsController::class, 'index']);
+    Route::get('/driver/dashboard', [DriverDashboardController::class, 'index']);
 });
 
 // ============================================
@@ -97,6 +107,7 @@ Route::middleware(['auth:sanctum', 'driver'])->group(function () {
 Route::middleware(['auth:sanctum', 'driver'])->group(function () {
     Route::post('/sales', [SaleController::class, 'store']);
     Route::get('/sales', [SaleController::class, 'index']); // Driver's own sales
+    Route::get('/driver/sales/statistics', [SaleController::class, 'salesStatistics']);
 });
 
 // Both admin and driver can view sale details and invoice

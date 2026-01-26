@@ -78,4 +78,36 @@ class ProductController extends Controller
 
         return response()->json(['message' => 'Product deleted successfully']);
     }
+
+    /**
+     * Get all products for drivers (read-only, for stock requests)
+     * Returns simplified product list without sensitive admin data
+     * Includes warehouse stock quantity for validation
+     */
+    public function driverIndex()
+    {
+        $products = Product::with(['category', 'warehouseStock'])
+            ->get()
+            ->map(function($product) {
+                $warehouseQuantity = $product->warehouseStock ? $product->warehouseStock->quantity : 0;
+                
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'price' => $product->price,
+                    'category_id' => $product->category_id,
+                    'category' => $product->category ? [
+                        'id' => $product->category->id,
+                        'name' => $product->category->name,
+                    ] : null,
+                    'description' => $product->description,
+                    'image' => $product->image,
+                    'warehouse_quantity' => $warehouseQuantity,
+                ];
+            });
+        
+        return response()->json([
+            'data' => $products,
+        ]);
+    }
 }

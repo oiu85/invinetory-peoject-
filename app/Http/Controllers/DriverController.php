@@ -7,6 +7,8 @@ use App\Models\StockAssignment;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Product;
+use App\Models\InventoryHistory;
+use App\Models\DriverStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -183,11 +185,14 @@ class DriverController extends Controller
                     'created_at' => $sale->created_at,
                     'items_count' => $sale->items->count(),
                     'items' => $sale->items->map(function($item) {
+                        $effectivePrice = $item->custom_price ?? $item->price;
                         return [
                             'product_name' => $item->product->name ?? 'N/A',
                             'quantity' => $item->quantity,
                             'price' => (float) $item->price,
-                            'subtotal' => (float) ($item->quantity * $item->price),
+                            'original_price' => (float) $item->price,
+                            'custom_price' => $item->custom_price ? (float) $item->custom_price : null,
+                            'subtotal' => (float) ($item->quantity * $effectivePrice),
                         ];
                     }),
                 ];
@@ -364,7 +369,7 @@ class DriverController extends Controller
                     ->first();
                 
                 $costPrice = $assignment ? (float) $assignment->product_price_at_assignment : (float) $item->product->price;
-                $sellingPrice = (float) $item->price;
+                $sellingPrice = $item->custom_price ?? (float) $item->price;
                 $profit = ($sellingPrice - $costPrice) * $item->quantity;
                 
                 $profitDetails[] = [
@@ -467,7 +472,7 @@ class DriverController extends Controller
                     ->first();
                 
                 $costPrice = $assignment ? (float) $assignment->product_price_at_assignment : (float) $item->product->price;
-                $sellingPrice = (float) $item->price;
+                $sellingPrice = $item->custom_price ?? (float) $item->price;
                 $profit = ($sellingPrice - $costPrice) * $item->quantity;
                 
                 $profitDetails[] = [
@@ -607,6 +612,157 @@ class DriverController extends Controller
         $driver->delete();
 
         return response()->json(['message' => 'Driver deleted successfully']);
+    }
+
+    /**
+     * Perform inventory for a driver
+     * Calculates earnings, creates snapshot, and resets earnings to 0
+     */
+    public function performInventory(Request $request, string $id)
+    {
+        $driver = User::where('type', 'driver')->findOrFail($id);
+
+        $validated = $request->validate([
+            'period_start_date' => 'required|date',
+            'period_end_date' => 'required|date|after_or_equal:period_start_date',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        // Get last inventory date (if exists) or driver creation date
+        $lastInventory = InventoryHistory::where('driver_id', $driver->id)
+            ->orderBy('performed_at', 'desc')
+            ->first();
+        
+        $periodStart = $lastInventory 
+            ? $lastInventory->performed_at 
+            : $driver->created_at;
+
+        // Get current stock snapshot
+        $stockSnapshot = $driver->driverStock()
+            ->with(['product.category'])
+            ->get()
+            ->map(function($stock) use ($driver) {
+                $assignment = StockAssignment::where('driver_id', $driver->id)
+                    ->where('product_id', $stock->product_id)
+                    ->orderBy('created_at', 'asc')
+                    ->first();
+                $costPrice = $assignment 
+                    ? (float) $assignment->product_price_at_assignment 
+                    : (float) ($stock->product->price ?? 0);
+                
+                return [
+                    'product_id' => $stock->product_id,
+                    'product_name' => $stock->product->name ?? 'N/A',
+                    'category_name' => $stock->product->category->name ?? 'N/A',
+                    'quantity' => $stock->quantity,
+                    'product_price' => (float) ($stock->product->price ?? 0),
+                    'cost_price' => $costPrice,
+                    'total_value' => (float) ($stock->quantity * ($stock->product->price ?? 0)),
+                    'total_cost_value' => (float) ($stock->quantity * $costPrice),
+                ];
+            });
+
+        // Calculate total stock value and cost value
+        $totalStockValue = $stockSnapshot->sum('total_value');
+        $totalCostValue = $stockSnapshot->sum('total_cost_value');
+
+        // Calculate earnings from sales since last inventory
+        $sales = Sale::where('driver_id', $driver->id)
+            ->where('created_at', '>=', $periodStart)
+            ->where('created_at', '<=', $validated['period_end_date'] . ' 23:59:59')
+            ->with(['items.product'])
+            ->get();
+
+        $earningsBeforeReset = 0;
+        foreach ($sales as $sale) {
+            foreach ($sale->items as $item) {
+                // Use custom_price if available, otherwise use price
+                $sellingPrice = $item->custom_price ?? $item->price;
+                
+                // Find cost price from assignment (FIFO)
+                $assignment = StockAssignment::where('driver_id', $driver->id)
+                    ->where('product_id', $item->product_id)
+                    ->where('created_at', '<=', $sale->created_at)
+                    ->orderBy('created_at', 'asc')
+                    ->first();
+                
+                $costPrice = $assignment 
+                    ? (float) $assignment->product_price_at_assignment 
+                    : (float) $item->product->price;
+                
+                $profit = ((float) $sellingPrice - $costPrice) * $item->quantity;
+                $earningsBeforeReset += $profit;
+            }
+        }
+
+        // Create inventory history record
+        $inventoryHistory = InventoryHistory::create([
+            'driver_id' => $driver->id,
+            'performed_at' => now(),
+            'stock_snapshot' => $stockSnapshot->toArray(),
+            'earnings_before_reset' => $earningsBeforeReset,
+            'earnings_after_reset' => 0,
+            'total_stock_value' => $totalStockValue,
+            'total_cost_value' => $totalCostValue,
+            'period_start_date' => $validated['period_start_date'],
+            'period_end_date' => $validated['period_end_date'],
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Inventory performed successfully',
+            'data' => [
+                'id' => $inventoryHistory->id,
+                'driver_id' => $inventoryHistory->driver_id,
+                'performed_at' => $inventoryHistory->performed_at->toIso8601String(),
+                'earnings_before_reset' => (float) $inventoryHistory->earnings_before_reset,
+                'earnings_after_reset' => (float) $inventoryHistory->earnings_after_reset,
+                'total_stock_value' => (float) $inventoryHistory->total_stock_value,
+                'total_cost_value' => (float) $inventoryHistory->total_cost_value,
+                'period_start_date' => $inventoryHistory->period_start_date->toDateString(),
+                'period_end_date' => $inventoryHistory->period_end_date->toDateString(),
+                'notes' => $inventoryHistory->notes,
+                'stock_snapshot_count' => count($stockSnapshot),
+            ],
+        ], 201);
+    }
+
+    /**
+     * Get inventory history for a driver
+     */
+    public function inventoryHistory(Request $request, string $id)
+    {
+        $driver = User::where('type', 'driver')->findOrFail($id);
+
+        $perPage = $request->input('per_page', 15);
+        $inventoryHistory = InventoryHistory::where('driver_id', $driver->id)
+            ->orderBy('performed_at', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $inventoryHistory->map(function($history) {
+                return [
+                    'id' => $history->id,
+                    'performed_at' => $history->performed_at->toIso8601String(),
+                    'earnings_before_reset' => (float) $history->earnings_before_reset,
+                    'earnings_after_reset' => (float) $history->earnings_after_reset,
+                    'total_stock_value' => (float) $history->total_stock_value,
+                    'total_cost_value' => (float) $history->total_cost_value,
+                    'period_start_date' => $history->period_start_date->toDateString(),
+                    'period_end_date' => $history->period_end_date->toDateString(),
+                    'notes' => $history->notes,
+                    'stock_snapshot' => $history->stock_snapshot,
+                ];
+            }),
+            'meta' => [
+                'current_page' => $inventoryHistory->currentPage(),
+                'per_page' => $inventoryHistory->perPage(),
+                'total' => $inventoryHistory->total(),
+                'last_page' => $inventoryHistory->lastPage(),
+            ],
+        ]);
     }
 }
 

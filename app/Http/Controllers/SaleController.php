@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SaleCreated;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\DriverStock;
@@ -22,6 +23,7 @@ class SaleController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.custom_price' => 'nullable|numeric|min:0',
         ]);
 
         $driver = $request->user();
@@ -41,13 +43,20 @@ class SaleController extends Controller
             }
 
             $product = $driverStock->product;
-            $itemTotal = $product->price * $item['quantity'];
+            // Use custom_price if provided, otherwise use product price
+            $itemPrice = isset($item['custom_price']) && $item['custom_price'] > 0
+                ? $item['custom_price']
+                : $product->price;
+            $itemTotal = $itemPrice * $item['quantity'];
             $totalAmount += $itemTotal;
 
             $saleItems[] = [
                 'product_id' => $item['product_id'],
                 'quantity' => $item['quantity'],
-                'price' => $product->price,
+                'price' => $product->price, // Original price for reference
+                'custom_price' => isset($item['custom_price']) && $item['custom_price'] > 0
+                    ? $item['custom_price']
+                    : null,
                 'total' => $itemTotal,
             ];
         }
@@ -69,6 +78,7 @@ class SaleController extends Controller
                 'product_id' => $item['product_id'],
                 'quantity' => $item['quantity'],
                 'price' => $item['price'],
+                'custom_price' => $item['custom_price'] ?? null,
             ]);
 
             $driverStock = DriverStock::where('driver_id', $driver->id)
@@ -80,6 +90,9 @@ class SaleController extends Controller
 
         $sale->load(['items.product', 'driver']);
 
+        // Dispatch SaleCreated event
+        event(new SaleCreated($sale));
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -88,12 +101,15 @@ class SaleController extends Controller
                 'customer_name' => $sale->customer_name,
                 'total_amount' => (float) $sale->total_amount,
                 'items' => $sale->items->map(function ($item) {
+                    $effectivePrice = $item->custom_price ?? $item->price;
                     return [
                         'product_id' => $item->product_id,
                         'product_name' => $item->product->name,
                         'quantity' => (int) $item->quantity,
                         'price' => (float) $item->price,
-                        'subtotal' => (float) ($item->quantity * $item->price),
+                        'original_price' => (float) $item->price,
+                        'custom_price' => $item->custom_price ? (float) $item->custom_price : null,
+                        'subtotal' => (float) ($item->quantity * $effectivePrice),
                     ];
                 }),
                 'created_at' => $sale->created_at->toIso8601String(),
@@ -148,6 +164,7 @@ class SaleController extends Controller
                     ] : null,
                     'items_count' => $sale->items->count(),
                     'items' => $sale->items->map(function ($item) {
+                        $effectivePrice = $item->custom_price ?? $item->price;
                         return [
                             'id' => $item->id,
                             'product_id' => $item->product_id,
@@ -155,7 +172,9 @@ class SaleController extends Controller
                             'product_image' => $item->product ? $item->product->image : null,
                             'quantity' => (int) $item->quantity,
                             'price' => (float) $item->price,
-                            'subtotal' => (float) ($item->quantity * $item->price),
+                            'original_price' => (float) $item->price,
+                            'custom_price' => $item->custom_price ? (float) $item->custom_price : null,
+                            'subtotal' => (float) ($item->quantity * $effectivePrice),
                         ];
                     }),
                     'created_at' => $sale->created_at->toIso8601String(),

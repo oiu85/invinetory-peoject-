@@ -18,6 +18,8 @@ use App\Http\Controllers\RoomLayoutController;
 use App\Http\Controllers\ProductDimensionController;
 use App\Http\Controllers\RoomVisualizationController;
 use App\Http\Controllers\DriverDashboardController;
+use App\Http\Controllers\StockOrderController;
+use App\Http\Controllers\FcmTokenController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -42,6 +44,10 @@ Route::post('/driver/reset-password', [AuthController::class, 'resetPassword']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    
+    // FCM Token Management
+    Route::post('/fcm-token', [FcmTokenController::class, 'store']);
+    Route::delete('/fcm-token', [FcmTokenController::class, 'destroy']);
 });
 
 // ============================================
@@ -98,6 +104,13 @@ Route::middleware(['auth:sanctum', 'driver'])->group(function () {
     Route::get('/driver/my-stock/{productId}', [DriverStockController::class, 'stockDetail']);
     Route::get('/driver/stats', [DriverStatsController::class, 'index']);
     Route::get('/driver/dashboard', [DriverDashboardController::class, 'index']);
+    
+    // Products (read-only for drivers - to request stock)
+    Route::get('/driver/products', [ProductController::class, 'driverIndex']);
+    
+    // Stock Orders (drivers can create and view their own)
+    Route::post('/stock-orders', [StockOrderController::class, 'store']);
+    Route::get('/stock-orders', [StockOrderController::class, 'index']); // Driver's own orders
 });
 
 // ============================================
@@ -136,9 +149,16 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/drivers/{id}/stock-history', [DriverController::class, 'stockHistory']);
     Route::get('/admin/drivers/{id}/inventory', [DriverController::class, 'inventory']);
     Route::get('/admin/drivers/{id}/settlement', [DriverController::class, 'settlement']);
+    Route::post('/admin/drivers/{id}/perform-inventory', [DriverController::class, 'performInventory']);
+    Route::get('/admin/drivers/{id}/inventory-history', [DriverController::class, 'inventoryHistory']);
     Route::put('/admin/drivers/{id}', [DriverController::class, 'update']);
     Route::delete('/admin/drivers/{id}', [DriverController::class, 'destroy']);
     Route::get('/admin/sales', [AdminSalesController::class, 'index']);
+    
+    // Stock Orders Management (admin)
+    Route::get('/admin/stock-orders', [StockOrderController::class, 'index']); // All orders
+    Route::post('/admin/stock-orders/{id}/approve', [StockOrderController::class, 'approve']);
+    Route::post('/admin/stock-orders/{id}/reject', [StockOrderController::class, 'reject']);
 
     // ============================================
     // ROOM SIMULATION ROUTES (Admin only)

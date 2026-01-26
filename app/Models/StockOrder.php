@@ -5,32 +5,36 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class SaleItem extends Model
+class StockOrder extends Model
 {
     protected $fillable = [
-        'sale_id',
+        'driver_id',
         'product_id',
         'quantity',
-        'price',
-        'custom_price',
+        'status',
+        'approved_by',
+        'rejection_reason',
     ];
 
     protected function casts(): array
     {
         return [
             'quantity' => 'integer',
-            'price' => 'decimal:2',
-            'custom_price' => 'decimal:2',
         ];
     }
 
-    public function sale(): BelongsTo
+    public function driver(): BelongsTo
     {
-        return $this->belongsTo(Sale::class);
+        return $this->belongsTo(User::class, 'driver_id');
     }
 
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 }

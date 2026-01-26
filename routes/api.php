@@ -22,6 +22,7 @@ use App\Http\Controllers\StockOrderController;
 use App\Http\Controllers\FcmTokenController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\FirebaseDiagnosticController;
+use App\Http\Controllers\FcmDiagnosticController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -166,6 +167,10 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::post('/admin/notifications/send-to-driver/{driverId}', [NotificationController::class, 'sendToDriver']);
     Route::post('/admin/notifications/send-to-all-drivers', [NotificationController::class, 'sendToAllDrivers']);
     Route::get('/admin/firebase/status', [FirebaseDiagnosticController::class, 'checkStatus']);
+    
+    // FCM Diagnostics (admin)
+    Route::get('/admin/fcm/diagnostics', [FcmDiagnosticController::class, 'diagnostics']);
+    Route::post('/admin/fcm/test-notification', [FcmDiagnosticController::class, 'testNotification']);
 
     // ============================================
     // ROOM SIMULATION ROUTES (Admin only)

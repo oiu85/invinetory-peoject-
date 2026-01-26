@@ -20,6 +20,8 @@ use App\Http\Controllers\RoomVisualizationController;
 use App\Http\Controllers\DriverDashboardController;
 use App\Http\Controllers\StockOrderController;
 use App\Http\Controllers\FcmTokenController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\FirebaseDiagnosticController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -159,6 +161,11 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/stock-orders', [StockOrderController::class, 'index']); // All orders
     Route::post('/admin/stock-orders/{id}/approve', [StockOrderController::class, 'approve']);
     Route::post('/admin/stock-orders/{id}/reject', [StockOrderController::class, 'reject']);
+
+    // Notification Management (admin)
+    Route::post('/admin/notifications/send-to-driver/{driverId}', [NotificationController::class, 'sendToDriver']);
+    Route::post('/admin/notifications/send-to-all-drivers', [NotificationController::class, 'sendToAllDrivers']);
+    Route::get('/admin/firebase/status', [FirebaseDiagnosticController::class, 'checkStatus']);
 
     // ============================================
     // ROOM SIMULATION ROUTES (Admin only)

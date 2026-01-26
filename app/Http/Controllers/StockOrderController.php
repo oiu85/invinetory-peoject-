@@ -70,6 +70,11 @@ class StockOrderController extends Controller
             $stockOrder->load(['product', 'driver']);
 
             // Dispatch StockOrderCreated event
+            Log::info('Dispatching StockOrderCreated event', [
+                'order_id' => $stockOrder->id,
+                'driver_id' => $stockOrder->driver_id,
+                'product_id' => $stockOrder->product_id,
+            ]);
             event(new StockOrderCreated($stockOrder));
 
             return response()->json([
@@ -275,6 +280,12 @@ class StockOrderController extends Controller
             $driverStock->refresh();
 
             // Dispatch StockOrderStatusChanged event
+            Log::info('Dispatching StockOrderStatusChanged event (approved)', [
+                'order_id' => $stockOrder->id,
+                'driver_id' => $stockOrder->driver_id,
+                'old_status' => 'pending',
+                'new_status' => 'approved',
+            ]);
             event(new StockOrderStatusChanged($stockOrder, 'pending', 'approved'));
 
             Log::info('Stock order approved successfully', [
@@ -367,6 +378,12 @@ class StockOrderController extends Controller
             $stockOrder->refresh();
 
             // Dispatch StockOrderStatusChanged event
+            Log::info('Dispatching StockOrderStatusChanged event (rejected)', [
+                'order_id' => $stockOrder->id,
+                'driver_id' => $stockOrder->driver_id,
+                'old_status' => $oldStatus,
+                'new_status' => 'rejected',
+            ]);
             event(new StockOrderStatusChanged($stockOrder, $oldStatus, 'rejected'));
 
             Log::info('Stock order rejected', [

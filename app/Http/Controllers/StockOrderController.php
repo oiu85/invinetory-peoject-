@@ -27,18 +27,38 @@ class StockOrderController extends Controller
 
     /**
      * Create a new stock order (driver only).
+     * Supports both single product and bulk creation.
      *
      * @param Request $request
      * @return JsonResponse
      */
     public function store(Request $request): JsonResponse
     {
+        $driver = $request->user();
+
+        // Check if request contains products array (bulk) or single product
+        if ($request->has('products') && is_array($request->products)) {
+            // Bulk creation - multiple products
+            return $this->storeBulk($request, $driver);
+        } else {
+            // Single product creation (backward compatible)
+            return $this->storeSingle($request, $driver);
+        }
+    }
+
+    /**
+     * Create a single stock order.
+     *
+     * @param Request $request
+     * @param $driver
+     * @return JsonResponse
+     */
+    private function storeSingle(Request $request, $driver): JsonResponse
+    {
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
             'quantity' => 'required|integer|min:1',
         ]);
-
-        $driver = $request->user();
 
         // Verify product exists
         $product = Product::findOrFail($validated['product_id']);
@@ -50,11 +70,23 @@ class StockOrderController extends Controller
             ->first();
 
         if ($existingOrder) {
+            // Load product relationship for better error message
+            $existingOrder->load('product');
+            
             return response()->json([
                 'success' => false,
                 'message' => 'You already have a pending order for this product',
+                'error' => 'DUPLICATE_PENDING_ORDER',
                 'data' => [
-                    'order_id' => $existingOrder->id,
+                    'existing_order' => [
+                        'order_id' => $existingOrder->id,
+                        'product_id' => $existingOrder->product_id,
+                        'product_name' => $existingOrder->product->name ?? 'Unknown',
+                        'quantity' => $existingOrder->quantity,
+                        'status' => $existingOrder->status,
+                        'created_at' => $existingOrder->created_at->toIso8601String(),
+                        'created_at_human' => $existingOrder->created_at->diffForHumans(),
+                    ],
                 ],
             ], 400);
         }
@@ -95,6 +127,123 @@ class StockOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create stock order',
+            ], 500);
+        }
+    }
+
+    /**
+     * Create multiple stock orders in bulk.
+     *
+     * @param Request $request
+     * @param $driver
+     * @return JsonResponse
+     */
+    private function storeBulk(Request $request, $driver): JsonResponse
+    {
+        $validated = $request->validate([
+            'products' => 'required|array|min:1',
+            'products.*.product_id' => 'required|exists:products,id',
+            'products.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $createdOrders = [];
+            $skippedProducts = [];
+            $errors = [];
+
+            foreach ($validated['products'] as $index => $productData) {
+                $productId = $productData['product_id'];
+                $quantity = $productData['quantity'];
+
+                // Check if there's already a pending order for this product
+                $existingOrder = StockOrder::where('driver_id', $driver->id)
+                    ->where('product_id', $productId)
+                    ->where('status', 'pending')
+                    ->first();
+
+                if ($existingOrder) {
+                    // Load product relationship
+                    $existingOrder->load('product');
+                    
+                    $skippedProducts[] = [
+                        'product_id' => $productId,
+                        'reason' => 'You already have a pending order for this product',
+                        'error' => 'DUPLICATE_PENDING_ORDER',
+                        'existing_order' => [
+                            'order_id' => $existingOrder->id,
+                            'product_id' => $existingOrder->product_id,
+                            'product_name' => $existingOrder->product->name ?? 'Unknown',
+                            'quantity' => $existingOrder->quantity,
+                            'status' => $existingOrder->status,
+                            'created_at' => $existingOrder->created_at->toIso8601String(),
+                        ],
+                    ];
+                    continue;
+                }
+
+                // Verify product exists
+                $product = Product::find($productId);
+                if (!$product) {
+                    $errors[] = [
+                        'product_id' => $productId,
+                        'error' => 'Product not found',
+                    ];
+                    continue;
+                }
+
+                $stockOrder = StockOrder::create([
+                    'driver_id' => $driver->id,
+                    'product_id' => $productId,
+                    'quantity' => $quantity,
+                    'status' => 'pending',
+                ]);
+
+                $stockOrder->load(['product', 'driver']);
+                $createdOrders[] = $stockOrder;
+
+                // Dispatch StockOrderCreated event for each order
+                Log::info('Dispatching StockOrderCreated event (bulk)', [
+                    'order_id' => $stockOrder->id,
+                    'driver_id' => $stockOrder->driver_id,
+                    'product_id' => $stockOrder->product_id,
+                ]);
+                event(new StockOrderCreated($stockOrder));
+            }
+
+            DB::commit();
+
+            $response = [
+                'success' => true,
+                'message' => count($createdOrders) . ' stock order(s) created successfully',
+                'data' => array_map(function ($order) {
+                    return [
+                        'id' => $order->id,
+                        'product_id' => $order->product_id,
+                        'product_name' => $order->product->name,
+                        'quantity' => $order->quantity,
+                        'status' => $order->status,
+                        'created_at' => $order->created_at->toIso8601String(),
+                    ];
+                }, $createdOrders),
+            ];
+
+            if (!empty($skippedProducts)) {
+                $response['skipped'] = $skippedProducts;
+            }
+
+            if (!empty($errors)) {
+                $response['errors'] = $errors;
+            }
+
+            return response()->json($response, 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to create bulk stock orders: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create stock orders: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -433,6 +582,75 @@ class StockOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to reject stock order: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Cancel a pending stock order (driver only).
+     * Drivers can only cancel their own pending orders.
+     *
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function cancel(Request $request, int $id): JsonResponse
+    {
+        $driver = $request->user();
+
+        try {
+            $stockOrder = StockOrder::with(['product'])
+                ->where('id', $id)
+                ->where('driver_id', $driver->id) // Ensure driver owns this order
+                ->firstOrFail();
+
+            // Check if order is still pending (can only cancel pending orders)
+            if ($stockOrder->status !== 'pending') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only pending orders can be cancelled. Current status: ' . $stockOrder->status,
+                    'current_status' => $stockOrder->status,
+                ], 400);
+            }
+
+            // Delete the order (soft delete if you add SoftDeletes trait, otherwise hard delete)
+            $stockOrder->delete();
+
+            Log::info('Driver cancelled pending stock order', [
+                'order_id' => $stockOrder->id,
+                'driver_id' => $driver->id,
+                'product_id' => $stockOrder->product_id,
+                'quantity' => $stockOrder->quantity,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock order cancelled successfully',
+                'data' => [
+                    'order_id' => $stockOrder->id,
+                    'product_name' => $stockOrder->product->name ?? 'Unknown',
+                ],
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::warning('Stock order not found for cancellation', [
+                'order_id' => $id,
+                'driver_id' => $driver->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock order not found or you do not have permission to cancel it',
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Failed to cancel stock order: ' . $e->getMessage(), [
+                'order_id' => $id,
+                'driver_id' => $driver->id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cancel stock order: ' . $e->getMessage(),
             ], 500);
         }
     }

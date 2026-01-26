@@ -111,9 +111,10 @@ Route::middleware(['auth:sanctum', 'driver'])->group(function () {
     // Products (read-only for drivers - to request stock)
     Route::get('/driver/products', [ProductController::class, 'driverIndex']);
     
-    // Stock Orders (drivers can create and view their own)
+    // Stock Orders (drivers can create, view, and cancel their own)
     Route::post('/stock-orders', [StockOrderController::class, 'store']);
     Route::get('/stock-orders', [StockOrderController::class, 'index']); // Driver's own orders
+    Route::delete('/stock-orders/{id}/cancel', [StockOrderController::class, 'cancel']); // Cancel pending order
 });
 
 // ============================================

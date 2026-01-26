@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\StockOrderCreated;
+use App\Helpers\NotificationTranslationHelper;
 use App\Services\FcmNotificationService;
 use Illuminate\Support\Facades\Log;
 
@@ -27,12 +28,16 @@ class NotifyAdminOnOrderCreated
             $order = $event->stockOrder;
             $order->load(['product', 'driver']);
 
-            $driverName = $order->driver->name ?? 'Unknown Driver';
-            $productName = $order->product->name ?? 'Unknown Product';
+            $driverName = $order->driver->name ?? 'سائق غير معروف';
+            $productName = $order->product->name ?? 'منتج غير معروف';
             $quantity = $order->quantity;
 
-            $title = 'New Stock Order Request';
-            $body = "Driver {$driverName} requested {$quantity} units of {$productName}";
+            // Get Arabic notification message
+            $notification = NotificationTranslationHelper::get('stock_order_created', [
+                'driver_name' => $driverName,
+                'quantity' => $quantity,
+                'product_name' => $productName,
+            ]);
 
             Log::info('Notifying admins about new stock order', [
                 'order_id' => $order->id,
@@ -42,22 +47,23 @@ class NotifyAdminOnOrderCreated
             ]);
 
             $result = $this->fcmService->sendToAdmins(
-                $title,
-                $body,
+                $notification['title'],
+                $notification['body'],
                 [
                     'type' => 'stock_order_created',
-                    'order_id' => $order->id,
-                    'driver_id' => $order->driver_id,
+                    'order_id' => (string) $order->id,
+                    'driver_id' => (string) $order->driver_id,
                     'driver_name' => $driverName,
-                    'product_id' => $order->product_id,
+                    'product_id' => (string) $order->product_id,
                     'product_name' => $productName,
-                    'quantity' => $quantity,
+                    'quantity' => (string) $quantity,
                 ]
             );
 
             if ($result) {
-                Log::info('Successfully sent notification to admins', [
+                Log::info('Successfully sent Arabic notification to admins', [
                     'order_id' => $order->id,
+                    'language' => 'ar',
                 ]);
             } else {
                 Log::warning('Failed to send notification to admins', [

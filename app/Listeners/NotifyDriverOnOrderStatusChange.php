@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\StockOrderStatusChanged;
+use App\Helpers\NotificationTranslationHelper;
 use App\Services\FcmNotificationService;
 use Illuminate\Support\Facades\Log;
 
@@ -27,16 +28,22 @@ class NotifyDriverOnOrderStatusChange
             $order = $event->stockOrder;
             $order->load(['product', 'driver']);
 
-            $productName = $order->product->name ?? 'Unknown Product';
+            $productName = $order->product->name ?? 'منتج غير معروف';
             $quantity = $order->quantity;
 
+            // Determine notification message based on status
             if ($event->newStatus === 'approved') {
-                $title = 'Stock Order Approved';
-                $body = "Your request for {$quantity} units of {$productName} has been approved";
+                $notification = NotificationTranslationHelper::get('stock_order_approved', [
+                    'quantity' => $quantity,
+                    'product_name' => $productName,
+                ]);
             } elseif ($event->newStatus === 'rejected') {
-                $title = 'Stock Order Rejected';
-                $reason = $order->rejection_reason ? " Reason: {$order->rejection_reason}" : '';
-                $body = "Your request for {$quantity} units of {$productName} has been rejected.{$reason}";
+                $reason = NotificationTranslationHelper::formatRejectionReason($order->rejection_reason);
+                $notification = NotificationTranslationHelper::get('stock_order_rejected', [
+                    'quantity' => $quantity,
+                    'product_name' => $productName,
+                    'reason' => $reason,
+                ]);
             } else {
                 // Only notify on status changes (approved/rejected)
                 Log::info('Skipping notification for status change', [
@@ -54,23 +61,24 @@ class NotifyDriverOnOrderStatusChange
 
             $result = $this->fcmService->sendToUser(
                 $order->driver_id,
-                $title,
-                $body,
+                $notification['title'],
+                $notification['body'],
                 [
                     'type' => 'stock_order_status_changed',
-                    'order_id' => $order->id,
-                    'product_id' => $order->product_id,
+                    'order_id' => (string) $order->id,
+                    'product_id' => (string) $order->product_id,
                     'product_name' => $productName,
-                    'quantity' => $quantity,
+                    'quantity' => (string) $quantity,
                     'status' => $event->newStatus,
-                    'rejection_reason' => $order->rejection_reason,
+                    'rejection_reason' => $order->rejection_reason ?? '',
                 ]
             );
 
             if ($result) {
-                Log::info('Successfully sent notification to driver', [
+                Log::info('Successfully sent Arabic notification to driver', [
                     'order_id' => $order->id,
                     'driver_id' => $order->driver_id,
+                    'language' => 'ar',
                 ]);
             } else {
                 Log::warning('Failed to send notification to driver', [
